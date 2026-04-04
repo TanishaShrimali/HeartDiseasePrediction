@@ -16,7 +16,7 @@ function loginUser() {
     if (data.message) {
       localStorage.setItem("user", email);
       localStorage.setItem("role", "patient");
-      window.location.href = "predict.html";
+      window.location.href = "http://127.0.0.1:5000/predict-page";
     } else {
       alert(data.error);
     }
@@ -40,7 +40,7 @@ function registerUser() {
   .then(res => res.json())
   .then(data => {
     alert(data.message);
-    window.location.href = "login.html";
+    window.location.href = "http://127.0.0.1:5000/login";
   });
 }
 
@@ -110,5 +110,5 @@ function loadHistory() {
 // LOGOUT
 function logout(){
   localStorage.clear();
-  window.location.href = "login.html";
+  window.location.href = "http://127.0.0.1:5000/login";
 }
