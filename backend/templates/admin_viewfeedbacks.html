@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>View Feedback | CardioGuard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900" data-required-role="admin">
+  <div class="flex min-h-screen">
+    <aside class="w-72 border-r border-slate-200 bg-white p-6">
+      <a href="admin_dashboard.html" class="text-2xl font-extrabold text-blue-900">CardioGuard</a>
+      <p class="mt-1 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Admin</p>
+      <nav class="mt-8 space-y-2">
+        <a href="admin_dashboard.html" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">Dashboard</a>
+        <a href="admin_managedoctors.html" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">Manage Doctors</a>
+        <a href="admin_viewpatients.html" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">View Patients</a>
+        <a href="admin_viewfeedbacks.html" class="block rounded-xl bg-blue-700 px-4 py-3 text-sm font-bold text-white">View Feedback</a>
+        <a href="index.html" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">Home</a>
+        <a href="login.html" data-logout="true" class="block rounded-xl px-4 py-3 text-sm font-semibold text-slate-700 hover:bg-slate-100">Logout</a>
+      </nav>
+    </aside>
+
+    <main class="flex-1 p-8">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 class="text-4xl font-extrabold text-slate-900">View Feedback</h1>
+          <p class="mt-2 text-slate-600">Feedback records listed directly from the feedback table.</p>
+        </div>
+        <span class="rounded-xl bg-white px-4 py-2 text-sm font-semibold text-slate-600 border border-slate-200">Total: <span id="admin-feedback-count">0</span></span>
+      </div>
+
+      <section class="mt-8 rounded-3xl bg-white shadow-sm border border-slate-200 overflow-hidden">
+        <table class="min-w-full">
+          <thead class="bg-slate-100">
+            <tr>
+              <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">ID</th>
+              <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Name</th>
+              <th class="px-6 py-3 text-left text-xs font-bold uppercase tracking-[0.2em] text-slate-500">Message</th>
+            </tr>
+          </thead>
+          <tbody id="admin-feedback-body"></tbody>
+        </table>
+      </section>
+    </main>
+  </div>
+  <script src="../static/js/auth.js"></script>
+  <script src="../static/js/admin.js"></script>
+</body>
+</html>

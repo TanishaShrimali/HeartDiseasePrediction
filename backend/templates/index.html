@@ -1,71 +1,87 @@
 <!DOCTYPE html>
-<html class="light" lang="en">
+<html lang="en">
 <head>
-<meta charset="utf-8"/>
-<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"/>
-<link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" rel="stylesheet"/>
-
-<script src="https://cdn.tailwindcss.com"></script>
-
-<title>CardioGuard</title>
-
-<style>
-body { font-family: 'Inter', sans-serif; }
-h1,h2 { font-family: 'Manrope', sans-serif; }
-
-.glass {
-    background: rgba(255,255,255,0.7);
-    backdrop-filter: blur(20px);
-    border: 1px solid rgba(200,200,200,0.2);
-}
-
-.gradient-text {
-    background: linear-gradient(135deg, #00478d, #005eb8);
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-}
-</style>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>CardioGuard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+  </style>
 </head>
-
-<body class="bg-gray-50 text-gray-800">
-
-<!-- HERO -->
-<section class="pt-32 pb-20 px-8 max-w-7xl mx-auto grid lg:grid-cols-2 gap-12 items-center">
-
-  <div class="space-y-8">
-
-    <div class="inline-flex items-center gap-2 bg-blue-100 text-blue-700 px-3 py-1 rounded-full text-xs font-bold uppercase">
-      <span class="material-symbols-outlined text-sm">verified</span>
-      ML Powered Healthcare
+<body class="min-h-screen bg-slate-50 text-slate-900" data-home-page="true">
+  <nav class="border-b border-slate-200 bg-white">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <a href="index.html" class="text-2xl font-extrabold text-blue-900">CardioGuard</a>
+      <div data-auth="guest" class="flex items-center gap-4 text-sm font-semibold">
+        <a href="login.html" class="text-slate-700 hover:text-blue-700">Login</a>
+        <a href="register.html" class="rounded-xl bg-blue-700 px-4 py-2 text-white">Register</a>
+      </div>
+      <div data-auth="user" class="hidden flex items-center gap-4 text-sm font-semibold">
+        <span class="text-slate-600"><span data-session-role>Role</span> logged in</span>
+        <a data-session-dashboard href="login.html" class="text-slate-700 hover:text-blue-700">Dashboard</a>
+        <a href="index.html" data-logout="true" class="rounded-xl bg-blue-700 px-4 py-2 text-white">Logout</a>
+      </div>
     </div>
+  </nav>
 
-    <h1 class="text-5xl font-extrabold leading-tight">
-      Your Heart’s Future, <br>
-      <span class="gradient-text">Predicted Intelligently</span>
-    </h1>
-
-    <p class="text-gray-600 text-lg max-w-lg">
-      CardioGuard analyzes your clinical data using ML to detect cardiovascular risks early.
-    </p>
-
-    <!-- ✅ FIXED BUTTON -->
-    <div class="flex gap-4">
-      <a href="/login">
-        <button class="px-8 py-4 bg-blue-600 text-white rounded-xl font-bold shadow-lg">
+  <main class="mx-auto grid max-w-7xl gap-10 px-6 py-16 lg:grid-cols-[1.15fr_0.85fr] lg:items-center">
+    <section>
+      <p class="inline-flex rounded-full bg-blue-100 px-4 py-1 text-xs font-bold uppercase tracking-[0.25em] text-blue-700">
+        Heart Disease Project
+      </p>
+      <h1 class="mt-6 max-w-3xl text-5xl font-extrabold leading-tight text-slate-900">
+        Check heart risk, manage records, and move through the portal easily.
+      </h1>
+      <p class="mt-5 max-w-2xl text-lg leading-8 text-slate-600">
+        CardioGuard gives patients, doctors, and admins one place to access the system with the right role-based login.
+      </p>
+      <div data-auth="guest" class="mt-8 flex flex-wrap gap-4">
+        <a href="login.html" class="rounded-2xl bg-blue-700 px-6 py-3 text-sm font-bold text-white shadow-lg">
           Login
-        </button>
-      </a>
-    </div>
+        </a>
+        <a href="register.html" class="rounded-2xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-800">
+          Create Account
+        </a>
+      </div>
+      <div data-auth="user" class="mt-8 hidden flex flex-wrap gap-4">
+        <a data-session-dashboard href="login.html" class="rounded-2xl bg-blue-700 px-6 py-3 text-sm font-bold text-white shadow-lg">
+          Go to Dashboard
+        </a>
+        <a href="index.html" data-logout="true" class="rounded-2xl border border-slate-300 px-6 py-3 text-sm font-bold text-slate-800">
+          Logout
+        </a>
+      </div>
+    </section>
 
-  </div>
-
-  <div>
-    <img src="https://lh3.googleusercontent.com/aida-public/AB6AXuBZoKhkyY6IKZalFGBeip3oTqN3vpjXIbeL8ZUtn8jGMAP1OoAADvU84H2numjgCzosIJHpd0ne1miqXKq4SJXK8tclOltj82tqYMaft6MyDb8vNAUqym_ViksVQ21NN6Jeil3g8N-1v7uPisJgnsaxnNICxo4_pRGGmz30qoljI6h4_LCup86BzRfBoCoqYWXDzxd0ETmOy2Q7cFyVXxBYM1wZcv2JXW9Mrh_-ymhYMTj0EjkkSKLXQ-K0dyRs2eXHf7ttT4haU5wf"/>
-  </div>
-
-</section>
-
+    <section class="rounded-[2rem] bg-gradient-to-br from-blue-900 via-blue-800 to-cyan-700 p-8 text-white shadow-2xl">
+      <h2 class="text-3xl font-extrabold">Portal Access</h2>
+      <div data-auth="guest" class="mt-8 grid gap-4">
+        <a href="login.html" class="rounded-2xl bg-white/10 px-5 py-4 transition hover:bg-white/20">
+          <div class="text-lg font-bold">Patient</div>
+          <div class="mt-1 text-sm text-blue-100">Open patient dashboard after patient login.</div>
+        </a>
+        <a href="login.html" class="rounded-2xl bg-white/10 px-5 py-4 transition hover:bg-white/20">
+          <div class="text-lg font-bold">Doctor</div>
+          <div class="mt-1 text-sm text-blue-100">Use doctor credentials to reach the doctor area.</div>
+        </a>
+        <a href="login.html" class="rounded-2xl bg-white/10 px-5 py-4 transition hover:bg-white/20">
+          <div class="text-lg font-bold">Admin</div>
+          <div class="mt-1 text-sm text-blue-100">Use admin credentials to manage the platform.</div>
+        </a>
+      </div>
+      <div data-auth="user" class="mt-8 hidden rounded-2xl bg-white/10 px-5 py-6">
+        <div class="text-lg font-bold">Session Active</div>
+        <div class="mt-2 text-sm text-blue-100">
+          You are already logged in as <span data-session-role>Role</span>. The public home page stays available, but login and registration stay hidden until you log out.
+        </div>
+      </div>
+    </section>
+  </main>
+  <script src="../static/js/auth.js"></script>
 </body>
 </html>

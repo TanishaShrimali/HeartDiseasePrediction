@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Patient Predict | CardioGuard</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Manrope:wght@700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    h1, h2, h3 { font-family: 'Manrope', sans-serif; }
+  </style>
+</head>
+<body class="min-h-screen bg-slate-50 text-slate-900" data-patient-page="true" data-required-role="patient">
+  <nav class="sticky top-0 z-20 border-b border-slate-200 bg-white/90 backdrop-blur">
+    <div class="mx-auto flex max-w-7xl items-center justify-between px-6 py-4">
+      <a href="index.html" class="text-2xl font-extrabold text-blue-900">CardioGuard</a>
+      <div class="flex flex-wrap items-center gap-5 text-sm font-semibold text-slate-600">
+        <a href="index.html" class="hover:text-blue-700">Home</a>
+        <a href="patient_dashboard.html" class="hover:text-blue-700">Dashboard</a>
+        <a href="patient_predict.html" class="text-blue-700">Predict</a>
+        <a href="patient_mydetail.html" class="hover:text-blue-700">My Detail</a>
+        <a href="patient_history.html" class="hover:text-blue-700">History</a>
+        <a href="patient_feedback.html" class="hover:text-blue-700">Feedback</a>
+        <a href="login.html" data-logout="true" class="hover:text-blue-700">Logout</a>
+      </div>
+    </div>
+  </nav>
+
+  <main class="mx-auto grid max-w-7xl gap-8 px-6 py-10 lg:grid-cols-[1.1fr_0.9fr]">
+    <section class="rounded-3xl border border-slate-200 bg-white p-8 shadow-sm">
+      <div class="flex flex-wrap items-center justify-between gap-4">
+        <div>
+          <h1 class="text-3xl font-extrabold text-slate-900">Heart Risk Prediction</h1>
+          <p class="mt-3 text-sm text-slate-600">Enter medically reasonable values only. Invalid ranges are blocked before submission and again by the backend.</p>
+        </div>
+        <a href="patient_dashboard.html" class="rounded-xl border border-slate-300 px-4 py-2 text-sm font-semibold text-slate-700 hover:border-blue-500 hover:text-blue-700">Back to Dashboard</a>
+      </div>
+
+      <form id="patient-predict-form" class="mt-8 grid gap-4 md:grid-cols-2">
+        <div>
+          <label for="predict-age" class="mb-2 block text-sm font-semibold text-slate-700">Age</label>
+          <input id="predict-age" type="number" min="1" max="120" step="1" placeholder="1 to 120" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <p class="mt-2 text-xs text-slate-500">Age in completed years.</p>
+        </div>
+
+        <div>
+          <label for="predict-sex" class="mb-2 block text-sm font-semibold text-slate-700">Sex</label>
+          <select id="predict-sex" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+            <option value="">Select</option>
+            <option value="1">1 = Male</option>
+            <option value="0">0 = Female</option>
+          </select>
+          <p class="mt-2 text-xs text-slate-500">Use the encoded value required by the model.</p>
+        </div>
+
+        <div>
+          <label for="predict-cp" class="mb-2 block text-sm font-semibold text-slate-700">Chest Pain Type</label>
+          <select id="predict-cp" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+            <option value="">Select type</option>
+            <option value="0">0 = Typical angina</option>
+            <option value="1">1 = Atypical angina</option>
+            <option value="2">2 = Non-anginal pain</option>
+            <option value="3">3 = Asymptomatic</option>
+          </select>
+          <details class="mt-2 text-xs text-slate-500">
+            <summary class="cursor-pointer font-semibold text-blue-700">What do 0, 1, 2, 3 mean?</summary>
+            <div class="mt-2 space-y-1 text-slate-600">
+              <p><strong>0:</strong> Typical angina, classic heart-related chest pain.</p>
+              <p><strong>1:</strong> Atypical angina, chest pain that is less typical.</p>
+              <p><strong>2:</strong> Non-anginal pain, chest pain not usually linked to angina.</p>
+              <p><strong>3:</strong> Asymptomatic, no chest pain symptoms reported.</p>
+            </div>
+          </details>
+        </div>
+
+        <div>
+          <label for="predict-bp" class="mb-2 block text-sm font-semibold text-slate-700">Resting Blood Pressure</label>
+          <input id="predict-bp" type="number" min="60" max="250" step="1" placeholder="60 to 250 mm Hg" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <p class="mt-2 text-xs text-slate-500">Blood pressure measured at rest in mm Hg.</p>
+        </div>
+
+        <div>
+          <label for="predict-chol" class="mb-2 block text-sm font-semibold text-slate-700">Cholesterol</label>
+          <input id="predict-chol" type="number" min="80" max="700" step="1" placeholder="80 to 700 mg/dL" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <p class="mt-2 text-xs text-slate-500">Serum cholesterol in mg/dL. Values like 3000 are not accepted.</p>
+        </div>
+
+        <div>
+          <label for="predict-fbs" class="mb-2 block text-sm font-semibold text-slate-700">Fasting Blood Sugar</label>
+          <select id="predict-fbs" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+            <option value="">Select</option>
+            <option value="1">1 = Greater than 120 mg/dL</option>
+            <option value="0">0 = 120 mg/dL or lower</option>
+          </select>
+          <p class="mt-2 text-xs text-slate-500">Model expects a binary value, not the raw sugar number.</p>
+        </div>
+
+        <div>
+          <label for="predict-ecg" class="mb-2 block text-sm font-semibold text-slate-700">Resting ECG</label>
+          <select id="predict-ecg" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+            <option value="">Select ECG code</option>
+            <option value="0">0 = Normal</option>
+            <option value="1">1 = ST-T wave abnormality</option>
+            <option value="2">2 = Left ventricular hypertrophy</option>
+          </select>
+          <details class="mt-2 text-xs text-slate-500">
+            <summary class="cursor-pointer font-semibold text-blue-700">What does Resting ECG mean?</summary>
+            <p class="mt-2 text-slate-600">This is the resting electrocardiogram result category used by the prediction model.</p>
+          </details>
+        </div>
+
+        <div>
+          <label for="predict-heart-rate" class="mb-2 block text-sm font-semibold text-slate-700">Max Heart Rate</label>
+          <input id="predict-heart-rate" type="number" min="40" max="250" step="1" placeholder="40 to 250 bpm" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <p class="mt-2 text-xs text-slate-500">Maximum heart rate achieved during exercise.</p>
+        </div>
+
+        <div>
+          <label for="predict-angina" class="mb-2 block text-sm font-semibold text-slate-700">Exercise Angina</label>
+          <select id="predict-angina" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+            <option value="">Select</option>
+            <option value="1">1 = Yes</option>
+            <option value="0">0 = No</option>
+          </select>
+          <p class="mt-2 text-xs text-slate-500">Whether exercise-induced angina is present.</p>
+        </div>
+
+        <div>
+          <label for="predict-oldpeak" class="mb-2 block text-sm font-semibold text-slate-700">Oldpeak</label>
+          <input id="predict-oldpeak" type="number" min="0" max="10" step="0.1" placeholder="0.0 to 10.0" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <details class="mt-2 text-xs text-slate-500">
+            <summary class="cursor-pointer font-semibold text-blue-700">What is Oldpeak?</summary>
+            <p class="mt-2 text-slate-600">Oldpeak measures ST depression caused by exercise relative to rest. It helps indicate possible heart stress.</p>
+          </details>
+        </div>
+
+        <div class="md:col-span-2">
+          <label for="predict-slope" class="mb-2 block text-sm font-semibold text-slate-700">ST Slope</label>
+          <select id="predict-slope" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+            <option value="">Select slope</option>
+            <option value="0">0 = Upsloping</option>
+            <option value="1">1 = Flat</option>
+            <option value="2">2 = Downsloping</option>
+          </select>
+          <details class="mt-2 text-xs text-slate-500">
+            <summary class="cursor-pointer font-semibold text-blue-700">What does ST slope mean?</summary>
+            <p class="mt-2 text-slate-600">This is the slope of the peak exercise ST segment on ECG and is encoded as 0, 1, or 2 for the model.</p>
+          </details>
+        </div>
+
+        <button type="submit" class="mt-2 rounded-xl bg-blue-700 px-5 py-3 font-bold text-white md:col-span-2">Predict Now</button>
+      </form>
+
+      <div class="mt-8 grid gap-4 md:grid-cols-3">
+        <a href="patient_mydetail.html" class="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700">Go to My Detail</a>
+        <a href="patient_history.html" class="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700">Go to History</a>
+        <a href="patient_feedback.html" class="rounded-2xl bg-slate-100 p-4 text-sm font-semibold text-slate-700 hover:bg-blue-50 hover:text-blue-700">Go to Feedback</a>
+      </div>
+    </section>
+
+    <aside class="space-y-6">
+      <section class="rounded-3xl bg-gradient-to-br from-slate-900 to-blue-900 p-8 text-white shadow-xl">
+        <h2 class="text-2xl font-extrabold">Prediction Result</h2>
+        <div class="mt-6 rounded-2xl bg-white/10 p-5">
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Current Status</p>
+          <p id="patient-predict-result" class="mt-3 text-3xl font-extrabold">Waiting for input</p>
+        </div>
+        <div class="mt-5 rounded-2xl bg-white/10 p-5">
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Doctor Suggestions</p>
+          <div id="patient-predict-doctors" class="mt-3 space-y-3 text-sm text-blue-50">Doctor suggestions will appear here for high-risk results.</div>
+        </div>
+      </section>
+
+      <section class="rounded-3xl border border-slate-200 bg-white p-6 shadow-sm">
+        <h3 class="text-xl font-extrabold text-slate-900">Quick Notes</h3>
+        <ul class="mt-4 space-y-3 text-sm text-slate-600">
+          <li>Use only medically reasonable values.</li>
+          <li>Binary fields must use the coded values shown in the form.</li>
+          <li>Hovering isn't required: open the small help sections to learn each term.</li>
+        </ul>
+      </section>
+    </aside>
+  </main>
+  <script src="../static/js/auth.js"></script>
+  <script src="../static/js/patient.js"></script>
+</body>
+</html>

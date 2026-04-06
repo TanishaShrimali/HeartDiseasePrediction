@@ -2,79 +2,88 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8">
-<title>Dashboard</title>
+<title>Patient Dashboard</title>
 
 <script src="https://cdn.tailwindcss.com"></script>
 
-<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Manrope:wght@600;700;800&display=swap" rel="stylesheet"/>
+<link href="https://fonts.googleapis.com/css2?family=Inter&family=Manrope:wght@700&display=swap" rel="stylesheet">
 
 <style>
 body { font-family: 'Inter', sans-serif; }
+h1 { font-family: 'Manrope', sans-serif; }
 </style>
-
 </head>
 
 <body class="bg-gray-50">
 
 <!-- NAVBAR -->
-<nav class="bg-blue-900 text-white px-7 py-4 flex justify-between">
-    <h1 class="font-bold">CardioGuard</h1>
-    
-    <button onclick="logout()" class="text-red-300">Logout</button>
+<nav class="bg-blue-900 text-white px-6 py-4 flex justify-between">
+  <h1 class="text-xl font-bold">CardioGuard</h1>
+  <button onclick="logout()" class="text-red-300">Logout</button>
 </nav>
 
-<div class="p-8 max-w-5xl mx-auto">
+<div class="max-w-6xl mx-auto p-8 grid md:grid-cols-2 gap-10">
 
-<h1 class="text-2xl font-bold mb-6">Heart Disease Prediction</h1>
+<!-- ================= FORM ================= -->
+<div class="bg-white p-6 rounded-xl shadow">
+
+<h2 class="text-xl font-bold mb-4">Enter Details</h2>
 
 <div class="grid grid-cols-2 gap-4">
 
-<input id="age" type="number" placeholder="Age" class="p-3 border rounded">
+<input id="age" type="number" placeholder="Age" class="p-2 border rounded">
 
-<select id="sex" class="p-3 border rounded">
+<select id="sex" class="p-2 border rounded">
 <option value="">Sex</option>
 <option value="1">Male</option>
 <option value="0">Female</option>
 </select>
 
-<input id="cp" placeholder="Chest Pain Type" class="p-3 border rounded">
-<input id="trestbps" placeholder="Resting BP" class="p-3 border rounded">
-<input id="chol" placeholder="Cholesterol" class="p-3 border rounded">
+<input id="cp" type="number" placeholder="Chest Pain (0-3)" class="p-2 border rounded">
+<input id="trestbps" type="number" placeholder="BP" class="p-2 border rounded">
 
-<select id="fbs" class="p-3 border rounded">
-<option value="">Fasting Sugar</option>
+<input id="chol" type="number" placeholder="Cholesterol" class="p-2 border rounded">
+
+<select id="fbs" class="p-2 border rounded">
+<option value="">FBS</option>
 <option value="1">>120</option>
 <option value="0"><=120</option>
 </select>
 
-<input id="restecg" placeholder="Rest ECG" class="p-3 border rounded">
-<input id="thalach" placeholder="Max Heart Rate" class="p-3 border rounded">
+<input id="restecg" type="number" placeholder="ECG" class="p-2 border rounded">
+<input id="thalach" type="number" placeholder="Heart Rate" class="p-2 border rounded">
 
-<select id="exang" class="p-3 border rounded">
-<option value="">Exercise Angina</option>
+<select id="exang" class="p-2 border rounded">
+<option value="">Angina</option>
 <option value="1">Yes</option>
 <option value="0">No</option>
 </select>
 
-<input id="oldpeak" placeholder="Oldpeak" class="p-3 border rounded">
-<input id="slope" placeholder="Slope" class="p-3 border rounded">
+<input id="oldpeak" type="number" placeholder="Oldpeak" class="p-2 border rounded">
+<input id="slope" type="number" placeholder="Slope" class="p-2 border rounded">
 
 </div>
 
-<button onclick="predict()" class="mt-6 px-6 py-3 bg-blue-600 text-white rounded">
+<button onclick="predict()" class="mt-6 w-full bg-blue-600 text-white py-3 rounded-lg">
 Predict
 </button>
 
-<div id="result" class="mt-4 text-lg font-bold"></div>
-<div id="doctors" class="mt-4"></div>
+</div>
 
-<h2 class="mt-8 font-bold">History</h2>
-<div id="historyList"></div>
+<!-- ================= RESULT ================= -->
+<div class="bg-white p-6 rounded-xl shadow">
+
+<h2 class="text-xl font-bold mb-4">Result</h2>
+
+<div id="result" class="text-lg font-semibold text-blue-700"></div>
+
+<div id="doctors" class="mt-4 text-sm text-gray-700"></div>
 
 </div>
 
-<!-- ✅ ONLY MAIN JS -->
-<script src="{{ url_for('static', filename='main.js') }}"></script>
+</div>
+
+<script src="main.js"></script>
 
 </body>
 </html>
