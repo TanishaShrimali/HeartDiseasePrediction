@@ -25,6 +25,184 @@ function isAdminEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
 
+function renderBarChart(containerId, labels, values, options = {}) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+
+  if (!labels.length || !values.length) {
+    container.innerHTML = '<div class="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-200 text-sm font-semibold text-slate-400">No chart data available.</div>';
+    return;
+  }
+
+  const maxValue = Math.max(...values, 1);
+  const barColor = options.barColor || "from-blue-500 to-cyan-400";
+  const valueColor = options.valueColor || "text-slate-900";
+
+  container.innerHTML = `
+    <div class="flex h-full items-end gap-3 rounded-[1.5rem] bg-slate-50 p-5">
+      ${labels.map((label, index) => {
+        const value = values[index] ?? 0;
+        const height = Math.max((value / maxValue) * 100, value > 0 ? 12 : 4);
+        return `
+          <div class="flex min-w-0 flex-1 flex-col items-center justify-end gap-3">
+            <span class="text-xs font-bold ${valueColor}">${value}</span>
+            <div class="flex h-52 w-full items-end">
+              <div class="w-full rounded-t-2xl bg-gradient-to-t ${barColor} shadow-lg" style="height:${height}%"></div>
+            </div>
+            <span class="text-center text-xs font-semibold text-slate-500">${escapeHtml(label)}</span>
+          </div>
+        `;
+      }).join("")}
+    </div>
+  `;
+}
+
+function renderGroupedBarChart(containerId, labels, seriesA, seriesB) {
+  const container = document.getElementById(containerId);
+  if (!container) {
+    return;
+  }
+
+  if (!labels.length) {
+    container.innerHTML = '<div class="flex h-full items-center justify-center rounded-3xl border border-dashed border-slate-200 text-sm font-semibold text-slate-400">No chart data available.</div>';
+    return;
+  }
+
+  const maxValue = Math.max(...seriesA, ...seriesB, 1);
+
+  container.innerHTML = `
+    <div class="h-full rounded-[1.5rem] bg-slate-50 p-5">
+      <div class="mb-5 flex flex-wrap gap-4 text-xs font-bold uppercase tracking-[0.2em] text-slate-500">
+        <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-blue-500"></span>Patients</span>
+        <span class="inline-flex items-center gap-2"><span class="h-3 w-3 rounded-full bg-cyan-500"></span>Doctors</span>
+      </div>
+      <div class="flex h-[13.5rem] items-end gap-3">
+        ${labels.map((label, index) => {
+          const patients = seriesA[index] ?? 0;
+          const doctors = seriesB[index] ?? 0;
+          const patientHeight = Math.max((patients / maxValue) * 100, patients > 0 ? 12 : 4);
+          const doctorHeight = Math.max((doctors / maxValue) * 100, doctors > 0 ? 12 : 4);
+          return `
+            <div class="flex min-w-0 flex-1 flex-col items-center gap-3">
+              <div class="flex h-52 w-full items-end justify-center gap-2">
+                <div class="w-full max-w-[1.15rem] rounded-t-2xl bg-blue-500 shadow-sm" style="height:${patientHeight}%"></div>
+                <div class="w-full max-w-[1.15rem] rounded-t-2xl bg-cyan-500 shadow-sm" style="height:${doctorHeight}%"></div>
+              </div>
+              <div class="text-center">
+                <div class="text-[11px] font-bold text-slate-900">${patients + doctors}</div>
+                <div class="text-xs font-semibold text-slate-500">${escapeHtml(label)}</div>
+              </div>
+            </div>
+          `;
+        }).join("")}
+      </div>
+    </div>
+  `;
+}
+
+function updateRiskVisuals(riskLevels) {
+  const total = riskLevels.total || 0;
+  const high = riskLevels.high || 0;
+  const low = riskLevels.low || 0;
+  const highPercent = total ? Math.round((high / total) * 100) : 0;
+  const lowPercent = total ? Math.round((low / total) * 100) : 0;
+
+  const ring = document.getElementById("admin-risk-ring");
+  const highCount = document.getElementById("admin-high-risk-count");
+  const lowCount = document.getElementById("admin-low-risk-count");
+  const highBar = document.getElementById("admin-high-risk-bar");
+  const lowBar = document.getElementById("admin-low-risk-bar");
+  const riskRate = document.getElementById("admin-risk-rate");
+
+  if (ring) {
+    ring.style.background = `conic-gradient(#f43f5e 0 ${highPercent}%, #10b981 ${highPercent}% 100%)`;
+    ring.innerHTML = `
+      <div class="flex h-36 w-36 flex-col items-center justify-center rounded-full bg-white text-center shadow-inner">
+        <span class="text-xs font-bold uppercase tracking-[0.2em] text-slate-500">High Risk</span>
+        <span class="mt-2 text-4xl font-extrabold text-slate-900">${highPercent}%</span>
+      </div>
+    `;
+  }
+
+  if (highCount) highCount.textContent = `${high} (${highPercent}%)`;
+  if (lowCount) lowCount.textContent = `${low} (${lowPercent}%)`;
+  if (highBar) highBar.style.width = `${highPercent}%`;
+  if (lowBar) lowBar.style.width = `${lowPercent}%`;
+  if (riskRate) riskRate.textContent = `${highPercent}%`;
+}
+
+function updateAdminInsights(labels, predictionSeries, userGrowth, riskLevels) {
+  const busiestDayEl = document.getElementById("admin-busiest-day");
+  const growthDayEl = document.getElementById("admin-growth-day");
+  const summaryEl = document.getElementById("admin-summary-line");
+  const predictions7El = document.getElementById("admin-seven-day-predictions");
+  const users7El = document.getElementById("admin-seven-day-users");
+
+  const busiestPredictionValue = Math.max(...predictionSeries, 0);
+  const busiestPredictionIndex = predictionSeries.indexOf(busiestPredictionValue);
+  const totalNewUsers = userGrowth.total.reduce((sum, value) => sum + value, 0);
+  const highestGrowthValue = Math.max(...userGrowth.total, 0);
+  const highestGrowthIndex = userGrowth.total.indexOf(highestGrowthValue);
+  const totalPredictions = predictionSeries.reduce((sum, value) => sum + value, 0);
+
+  if (busiestDayEl) {
+    busiestDayEl.textContent = busiestPredictionValue > 0 ? `${labels[busiestPredictionIndex]} (${busiestPredictionValue} predictions)` : "No recent prediction activity";
+  }
+
+  if (growthDayEl) {
+    growthDayEl.textContent = highestGrowthValue > 0 ? `${labels[highestGrowthIndex]} (${highestGrowthValue} new users)` : "No recent user growth";
+  }
+
+  if (predictions7El) {
+    predictions7El.textContent = totalPredictions;
+  }
+
+  if (users7El) {
+    users7El.textContent = totalNewUsers;
+  }
+
+  if (summaryEl) {
+    if (!riskLevels.total) {
+      summaryEl.textContent = "There are no prediction records yet, so risk distribution and activity trends will appear as patients start using the system.";
+    } else {
+      summaryEl.textContent = `${riskLevels.high} high-risk and ${riskLevels.low} low-risk predictions are currently stored. The chart area above reflects the latest 7-day activity and new account creation pattern.`;
+    }
+  }
+}
+
+async function loadAdminAnalytics() {
+  const predictionChart = document.getElementById("admin-prediction-chart");
+  const userGrowthChart = document.getElementById("admin-user-growth-chart");
+  const riskRing = document.getElementById("admin-risk-ring");
+
+  if (!predictionChart && !userGrowthChart && !riskRing) {
+    return;
+  }
+
+  try {
+    const data = await adminFetchJson("/admin-analytics");
+    renderBarChart("admin-prediction-chart", data.labels || [], data.prediction_series || [], {
+      barColor: "from-blue-600 via-cyan-500 to-emerald-400"
+    });
+    renderGroupedBarChart("admin-user-growth-chart", data.labels || [], data.user_growth?.patients || [], data.user_growth?.doctors || []);
+    updateRiskVisuals(data.risk_levels || { high: 0, low: 0, total: 0 });
+    updateAdminInsights(data.labels || [], data.prediction_series || [], data.user_growth || { total: [] }, data.risk_levels || { high: 0, low: 0, total: 0 });
+  } catch (error) {
+    if (predictionChart) {
+      predictionChart.innerHTML = '<div class="flex h-full items-center justify-center rounded-3xl border border-dashed border-rose-200 text-sm font-semibold text-rose-600">Unable to load prediction analytics.</div>';
+    }
+    if (userGrowthChart) {
+      userGrowthChart.innerHTML = '<div class="flex h-full items-center justify-center rounded-3xl border border-dashed border-rose-200 text-sm font-semibold text-rose-600">Unable to load growth analytics.</div>';
+    }
+    const summaryEl = document.getElementById("admin-summary-line");
+    if (summaryEl) {
+      summaryEl.textContent = "Analytics are temporarily unavailable.";
+    }
+  }
+}
+
 function setDoctorFormMode(mode) {
   const title = document.getElementById("doctor-form-title");
   const button = document.getElementById("doctor-form-submit");
@@ -80,6 +258,7 @@ async function deleteDoctor(id, name) {
       }
       loadDoctorsTable();
       loadAdminDashboard();
+      loadAdminAnalytics();
       return;
     }
 
@@ -104,6 +283,7 @@ async function deletePatient(id, name) {
     if (data.message) {
       loadPatientsTable();
       loadAdminDashboard();
+      loadAdminAnalytics();
       return;
     }
 
@@ -305,6 +485,7 @@ async function saveDoctor(event) {
       resetDoctorForm();
       loadDoctorsTable();
       loadAdminDashboard();
+      loadAdminAnalytics();
       return;
     }
 
@@ -320,6 +501,7 @@ window.addEventListener("DOMContentLoaded", () => {
   }
 
   loadAdminDashboard();
+  loadAdminAnalytics();
   loadDoctorsTable();
   loadPatientsTable();
   loadFeedbackTable();

@@ -6,6 +6,12 @@ function getPatientEmail() {
   return localStorage.getItem("user") || "";
 }
 
+function setPatientEmail(email) {
+  localStorage.setItem("user", email);
+}
+
+let latestPredictionAvailableForEmail = false;
+
 function escapePatientHtml(value) {
   return String(value ?? "")
     .replace(/&/g, "&amp;")
@@ -116,6 +122,17 @@ async function loadPatientProfile() {
     if (emailEl) emailEl.textContent = data.email;
     if (recordEl) recordEl.textContent = `Patient Email: ${data.email}`;
 
+    const editName = document.getElementById("edit-patient-name");
+    const editEmail = document.getElementById("edit-patient-email");
+    const editPassword = document.getElementById("edit-patient-password");
+    const editConfirmPassword = document.getElementById("edit-patient-confirm-password");
+    const profileStatus = document.getElementById("patient-profile-status");
+    if (editName) editName.value = data.name;
+    if (editEmail) editEmail.value = data.email;
+    if (editPassword) editPassword.value = "";
+    if (editConfirmPassword) editConfirmPassword.value = "";
+    if (profileStatus) profileStatus.textContent = "Edit your details and save when ready.";
+
     const feedbackName = document.getElementById("feedback-name");
     const feedbackEmail = document.getElementById("feedback-email");
     if (feedbackName) feedbackName.value = data.name;
@@ -125,6 +142,85 @@ async function loadPatientProfile() {
     if (emailEl) emailEl.textContent = email;
     if (recordEl) recordEl.textContent = "Profile unavailable";
   }
+}
+
+async function submitPatientProfileUpdate(event) {
+  event.preventDefault();
+
+  const currentEmail = getPatientEmail();
+  const name = document.getElementById("edit-patient-name")?.value.trim() || "";
+  const email = document.getElementById("edit-patient-email")?.value.trim().toLowerCase() || "";
+  const password = document.getElementById("edit-patient-password")?.value.trim() || "";
+  const confirmPassword = document.getElementById("edit-patient-confirm-password")?.value.trim() || "";
+  const statusEl = document.getElementById("patient-profile-status");
+
+  if (!name || !email) {
+    alert("Name and email are required.");
+    return;
+  }
+
+  if (name.length < 2 || name.length > 60 || !/^[A-Za-z ]+$/.test(name)) {
+    alert("Name must contain only letters and spaces, and be between 2 and 60 characters.");
+    return;
+  }
+
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    alert("Enter a valid email address.");
+    return;
+  }
+
+  if (password) {
+    if (password.length < 8 || password.length > 64) {
+      alert("Password must be between 8 and 64 characters.");
+      return;
+    }
+    if (password !== confirmPassword) {
+      alert("New password and confirm password must match.");
+      return;
+    }
+  }
+
+  if (statusEl) {
+    statusEl.textContent = "Saving profile...";
+  }
+
+  try {
+    const data = await patientFetchJson("/update-patient-profile", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ current_email: currentEmail, name, email, password })
+    });
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    setPatientEmail(data.email);
+    if (statusEl) {
+      statusEl.textContent = data.message || "Profile updated successfully.";
+    }
+    await loadPatientProfile();
+    await loadPatientDashboard();
+  } catch (error) {
+    if (statusEl) {
+      statusEl.textContent = error.message || "Unable to update profile.";
+    }
+    alert(error.message || "Unable to update profile.");
+  }
+}
+
+function resetPatientProfileForm() {
+  loadPatientProfile();
+}
+
+function downloadPatientPredictionReport(predictionId) {
+  const email = getPatientEmail();
+  if (!email || !predictionId) {
+    return;
+  }
+
+  const url = `http://127.0.0.1:5000/download-prediction-report?email=${encodeURIComponent(email)}&prediction_id=${encodeURIComponent(predictionId)}`;
+  window.open(url, "_blank");
 }
 
 async function loadPatientHistory() {
@@ -149,7 +245,7 @@ async function loadPatientHistory() {
     }
 
     if (!history.length) {
-      tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-slate-500">No prediction history found.</td></tr>';
+      tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-slate-500">No prediction history found.</td></tr>';
       return;
     }
 
@@ -162,11 +258,20 @@ async function loadPatientHistory() {
           <td class="px-4 py-4 text-sm text-slate-700">${escapePatientHtml(item.date)}</td>
           <td class="px-4 py-4 text-sm font-semibold text-slate-900">${escapePatientHtml(item.result)}</td>
           <td class="px-4 py-4"><span class="rounded-full px-3 py-1 text-xs font-bold ${statusClass}">${escapePatientHtml(item.result)}</span></td>
+          <td class="px-4 py-4">
+            <button type="button" class="rounded-xl bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100" data-download-report-id="${escapePatientHtml(item.id)}">Download PDF</button>
+          </td>
         </tr>
       `;
     }).join("");
+
+    tbody.querySelectorAll("[data-download-report-id]").forEach((button) => {
+      button.addEventListener("click", () => {
+        downloadPatientPredictionReport(button.getAttribute("data-download-report-id"));
+      });
+    });
   } catch (error) {
-    tbody.innerHTML = '<tr><td colspan="3" class="px-4 py-8 text-center text-sm text-rose-600">Unable to load history.</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="4" class="px-4 py-8 text-center text-sm text-rose-600">Unable to load history.</td></tr>';
   }
 }
 
@@ -176,6 +281,8 @@ async function submitPatientPrediction(event) {
   const email = getPatientEmail();
   const resultEl = document.getElementById("patient-predict-result");
   const doctorsEl = document.getElementById("patient-predict-doctors");
+  const emailStatusEl = document.getElementById("patient-predict-email-status");
+  const emailButton = document.getElementById("patient-email-report-button");
   if (!email) {
     window.location.href = "login.html";
     return;
@@ -220,17 +327,75 @@ async function submitPatientPrediction(event) {
       resultEl.textContent = data.prediction || "Prediction complete";
     }
     doctorsEl.innerHTML = "";
+    latestPredictionAvailableForEmail = Boolean(data.email_ready);
+    if (emailButton) {
+      emailButton.classList.toggle("hidden", !latestPredictionAvailableForEmail);
+      emailButton.disabled = false;
+    }
+    if (emailStatusEl) {
+      emailStatusEl.textContent = data.email_message || "Prediction report status unavailable.";
+    }
 
     if (data.doctors && data.doctors.length) {
       doctorsEl.innerHTML = data.doctors.map((doctor) => `
         <div class="rounded-2xl bg-white/10 p-4 text-sm text-blue-50">
           <div class="font-bold">${escapePatientHtml(doctor.name)}</div>
-          <div class="mt-1 text-blue-100">${escapePatientHtml(doctor.location)}</div>
+          <div class="mt-1 text-blue-100">${escapePatientHtml(doctor.specialization || "Doctor")} - ${escapePatientHtml(doctor.location)}</div>
+          <div class="mt-1 text-blue-200">${escapePatientHtml(doctor.email || "Email not available")}</div>
         </div>
       `).join("");
     }
   } catch (error) {
     resultEl.textContent = "Unable to submit prediction.";
+    latestPredictionAvailableForEmail = false;
+    if (emailButton) {
+      emailButton.classList.add("hidden");
+      emailButton.disabled = false;
+    }
+    if (emailStatusEl) {
+      emailStatusEl.textContent = "Email report not available because the prediction could not be completed.";
+    }
+  }
+}
+
+async function emailLatestPredictionReport() {
+  const email = getPatientEmail();
+  const emailStatusEl = document.getElementById("patient-predict-email-status");
+  const emailButton = document.getElementById("patient-email-report-button");
+
+  if (!email || !latestPredictionAvailableForEmail) {
+    return;
+  }
+
+  if (emailStatusEl) {
+    emailStatusEl.textContent = "Sending your prediction report...";
+  }
+  if (emailButton) {
+    emailButton.disabled = true;
+  }
+
+  try {
+    const data = await patientFetchJson("/email-prediction-report", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email })
+    });
+
+    if (data.error) {
+      throw new Error(data.error);
+    }
+
+    if (emailStatusEl) {
+      emailStatusEl.textContent = data.email_message || "Prediction report email status unavailable.";
+    }
+  } catch (error) {
+    if (emailStatusEl) {
+      emailStatusEl.textContent = error.message || "Unable to send the email report.";
+    }
+  } finally {
+    if (emailButton) {
+      emailButton.disabled = false;
+    }
   }
 }
 
@@ -292,5 +457,20 @@ window.addEventListener("DOMContentLoaded", () => {
   const feedbackForm = document.getElementById("patient-feedback-form");
   if (feedbackForm) {
     feedbackForm.addEventListener("submit", submitPatientFeedback);
+  }
+
+  const profileForm = document.getElementById("patient-profile-form");
+  if (profileForm) {
+    profileForm.addEventListener("submit", submitPatientProfileUpdate);
+  }
+
+  const profileReset = document.getElementById("patient-profile-reset");
+  if (profileReset) {
+    profileReset.addEventListener("click", resetPatientProfileForm);
+  }
+
+  const emailReportButton = document.getElementById("patient-email-report-button");
+  if (emailReportButton) {
+    emailReportButton.addEventListener("click", emailLatestPredictionReport);
   }
 });

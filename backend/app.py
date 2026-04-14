@@ -8,6 +8,13 @@ import json
 import re
 import bcrypt
 from pathlib import Path
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from io import BytesIO
+from flask import send_file
+from fpdf import FPDF
 
 app = Flask(__name__)
 CORS(app)
@@ -19,12 +26,46 @@ DB_PATH = DATA_DIR / "database.db"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.pkl"
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
 
+PREDICTION_FIELD_LABELS = {
+    "age": "Age",
+    "sex": "Sex",
+    "chest_pain_type": "Chest Pain Type",
+    "resting_bp_s": "Resting Blood Pressure",
+    "cholesterol": "Cholesterol",
+    "fasting_blood_sugar": "Fasting Blood Sugar",
+    "resting_ecg": "Resting ECG",
+    "max_heart_rate": "Max Heart Rate",
+    "exercise_angina": "Exercise Angina",
+    "oldpeak": "Oldpeak",
+    "st_slope": "ST Slope"
+}
+
 def get_db_connection():
     DATA_DIR.mkdir(exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute("PRAGMA journal_mode=MEMORY")
     conn.execute("PRAGMA synchronous=OFF")
     return conn
+
+def current_timestamp():
+    return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def get_email_settings():
+    host = os.environ.get("SMTP_HOST", "").strip()
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    username = os.environ.get("SMTP_USERNAME", "").strip()
+    password = os.environ.get("SMTP_PASSWORD", "").strip()
+    from_email = os.environ.get("SMTP_FROM_EMAIL", username).strip()
+    use_tls = os.environ.get("SMTP_USE_TLS", "true").strip().lower() != "false"
+
+    return {
+        "host": host,
+        "port": port,
+        "username": username,
+        "password": password,
+        "from_email": from_email,
+        "use_tls": use_tls
+    }
 
 # ================= LOAD MODEL =================
 model = joblib.load(BEST_MODEL_PATH)
@@ -41,9 +82,16 @@ def init_db():
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         name TEXT,
         email TEXT UNIQUE,
-        password TEXT
+        password TEXT,
+        created_at TEXT
     )
     """)
+
+    cursor.execute("PRAGMA table_info(patients)")
+    patient_columns = [row[1] for row in cursor.fetchall()]
+    if "created_at" not in patient_columns:
+        cursor.execute("ALTER TABLE patients ADD COLUMN created_at TEXT")
+    cursor.execute("UPDATE patients SET created_at=? WHERE created_at IS NULL OR created_at=''", (current_timestamp(),))
 
     # DOCTORS
     cursor.execute("""
@@ -53,7 +101,8 @@ def init_db():
         specialization TEXT,
         location TEXT,
         email TEXT,
-        password TEXT
+        password TEXT,
+        created_at TEXT
     )
     """)
 
@@ -67,6 +116,9 @@ def init_db():
         cursor.execute("ALTER TABLE doctors ADD COLUMN email TEXT")
     if "password" not in doctor_columns:
         cursor.execute("ALTER TABLE doctors ADD COLUMN password TEXT")
+    if "created_at" not in doctor_columns:
+        cursor.execute("ALTER TABLE doctors ADD COLUMN created_at TEXT")
+    cursor.execute("UPDATE doctors SET created_at=? WHERE created_at IS NULL OR created_at=''", (current_timestamp(),))
 
     # PREDICTIONS
     cursor.execute("""
@@ -180,6 +232,184 @@ def validate_account_input(name=None, email=None, password=None):
             return "Password must be between 8 and 64 characters"
 
     return None
+
+def format_prediction_details(data):
+    return [
+        {"label": PREDICTION_FIELD_LABELS[key], "value": data.get(key)}
+        for key in PREDICTION_FIELD_LABELS
+        if key in data
+    ]
+
+def format_prediction_details_from_values(values):
+    detail_rows = []
+    labels = list(PREDICTION_FIELD_LABELS.values())
+    for index, label in enumerate(labels):
+        value = values[index] if index < len(values) else ""
+        detail_rows.append({"label": label, "value": value})
+    return detail_rows
+
+def get_prediction_precautions(result):
+    if result == "High Risk":
+        return [
+            "Schedule a doctor consultation as early as possible.",
+            "Seek urgent medical help if there is chest pain, fainting, or breathing difficulty.",
+            "Avoid smoking, heavy alcohol use, and high-fat meals until reviewed by a doctor.",
+            "Monitor blood pressure, sugar, and cholesterol regularly.",
+            "Continue only doctor-approved exercise and medication plans."
+        ]
+
+    return [
+        "Maintain regular exercise, balanced food choices, and good sleep.",
+        "Keep routine checks for blood pressure, cholesterol, and blood sugar.",
+        "Avoid smoking and limit alcohol intake.",
+        "Repeat screening if symptoms appear or risk factors increase."
+    ]
+
+def build_prediction_email_html(patient_name, email, result, prediction_date, details, precautions, doctors):
+    doctor_block = ""
+    if doctors:
+        doctor_rows = "".join(
+            f"<li><strong>{doctor['name']}</strong> - {doctor['specialization']}, {doctor['location']}"
+            + (f" ({doctor['email']})" if doctor.get("email") else "")
+            + "</li>"
+            for doctor in doctors
+        )
+        doctor_block = f"""
+        <h3 style="margin-top:24px;color:#0f172a;">Recommended Doctors</h3>
+        <ul style="padding-left:18px;color:#334155;line-height:1.7;">{doctor_rows}</ul>
+        """
+
+    detail_rows = "".join(
+        f"<tr><td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#334155;'>{item['label']}</td>"
+        f"<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a;'>{item['value']}</td></tr>"
+        for item in details
+    )
+    precaution_rows = "".join(
+        f"<li style='margin-bottom:8px;'>{item}</li>"
+        for item in precautions
+    )
+
+    status_color = "#f43f5e" if result == "High Risk" else "#10b981"
+    status_note = "Doctor consultation is recommended." if result == "High Risk" else "Continue preventive care and healthy habits."
+
+    return f"""
+    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
+      <div style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;">
+        <div style="background:linear-gradient(135deg,#0f172a,#0f4c81,#0891b2);padding:28px 32px;color:white;">
+          <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#bfdbfe;">CardioGuard Prediction Report</p>
+          <h1 style="margin:12px 0 0;font-size:30px;line-height:1.2;">Your Heart Risk Result</h1>
+          <p style="margin:10px 0 0;font-size:15px;color:#dbeafe;">Generated on {prediction_date} for {email}</p>
+        </div>
+        <div style="padding:32px;">
+          <p style="margin:0 0 16px;font-size:16px;color:#334155;">Hello {patient_name or 'Patient'},</p>
+          <div style="border-radius:20px;padding:20px;background:#f8fafc;border:1px solid #e2e8f0;">
+            <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#64748b;">Prediction Status</p>
+            <p style="margin:12px 0 4px;font-size:34px;font-weight:800;color:{status_color};">{result}</p>
+            <p style="margin:0;color:#475569;">{status_note}</p>
+          </div>
+
+          <h3 style="margin-top:28px;color:#0f172a;">Submitted Details</h3>
+          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
+            <tbody>{detail_rows}</tbody>
+          </table>
+
+          <h3 style="margin-top:24px;color:#0f172a;">Suggested Precautions</h3>
+          <ul style="padding-left:18px;color:#334155;line-height:1.7;">{precaution_rows}</ul>
+
+          {doctor_block}
+
+          <div style="margin-top:28px;padding:18px;border-radius:18px;background:#eff6ff;border:1px solid #bfdbfe;">
+            <p style="margin:0 0 8px;font-weight:700;color:#1d4ed8;">Important Note</p>
+            <p style="margin:0;color:#1e3a8a;line-height:1.6;">
+              This report is generated from the selected machine learning model and supports screening only. It does not replace professional diagnosis or emergency care.
+            </p>
+          </div>
+        </div>
+      </div>
+    </div>
+    """
+
+def send_prediction_report_email(recipient_email, patient_name, result, prediction_date, details, precautions, doctors):
+    settings = get_email_settings()
+    if not settings["host"] or not settings["from_email"]:
+        return False, "Email settings are not configured."
+
+    subject = f"CardioGuard Prediction Report - {result}"
+    html_body = build_prediction_email_html(
+        patient_name=patient_name,
+        email=recipient_email,
+        result=result,
+        prediction_date=prediction_date,
+        details=details,
+        precautions=precautions,
+        doctors=doctors
+    )
+
+    message = MIMEMultipart("alternative")
+    message["Subject"] = subject
+    message["From"] = settings["from_email"]
+    message["To"] = recipient_email
+    message.attach(MIMEText(html_body, "html"))
+
+    try:
+        with smtplib.SMTP(settings["host"], settings["port"], timeout=20) as server:
+            if settings["use_tls"]:
+                server.starttls()
+            if settings["username"] and settings["password"]:
+                server.login(settings["username"], settings["password"])
+            server.sendmail(settings["from_email"], [recipient_email], message.as_string())
+        return True, "Prediction report email sent successfully."
+    except Exception as error:
+        return False, f"Prediction saved, but email could not be sent: {error}"
+
+def build_prediction_report_pdf(patient_name, email, result, prediction_date, details, precautions, doctors):
+    pdf = FPDF()
+    pdf.set_auto_page_break(auto=True, margin=15)
+    pdf.add_page()
+
+    pdf.set_font("Arial", "B", 18)
+    pdf.cell(0, 10, "CardioGuard Prediction Report", ln=True)
+
+    pdf.set_font("Arial", "", 11)
+    pdf.ln(2)
+    pdf.cell(0, 8, f"Patient: {patient_name}", ln=True)
+    pdf.cell(0, 8, f"Email: {email}", ln=True)
+    pdf.cell(0, 8, f"Generated: {prediction_date}", ln=True)
+
+    pdf.ln(4)
+    pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, f"Prediction Result: {result}", ln=True)
+
+    pdf.set_font("Arial", "", 11)
+    pdf.multi_cell(0, 8, "This report is generated from the selected machine learning model and is intended for screening support only. It does not replace professional diagnosis or emergency care.")
+
+    pdf.ln(3)
+    pdf.set_font("Arial", "B", 13)
+    pdf.cell(0, 10, "Submitted Details", ln=True)
+    pdf.set_font("Arial", "", 11)
+    for item in details:
+        pdf.multi_cell(0, 8, f"{item['label']}: {item['value']}")
+
+    pdf.ln(3)
+    pdf.set_font("Arial", "B", 13)
+    pdf.cell(0, 10, "Suggested Precautions", ln=True)
+    pdf.set_font("Arial", "", 11)
+    for index, precaution in enumerate(precautions, start=1):
+        pdf.multi_cell(0, 8, f"{index}. {precaution}")
+
+    if doctors:
+        pdf.ln(3)
+        pdf.set_font("Arial", "B", 13)
+        pdf.cell(0, 10, "Recommended Doctors", ln=True)
+        pdf.set_font("Arial", "", 11)
+        for doctor in doctors:
+            doctor_line = f"{doctor['name']} - {doctor.get('specialization', 'Doctor')}, {doctor['location']}"
+            if doctor.get("email"):
+                doctor_line += f" ({doctor['email']})"
+            pdf.multi_cell(0, 8, doctor_line)
+
+    pdf_bytes = pdf.output(dest="S").encode("latin-1")
+    return BytesIO(pdf_bytes)
 
 init_db()
 
@@ -358,11 +588,12 @@ def register():
 
     try:
         cursor.execute(
-            "INSERT INTO patients (name, email, password) VALUES (?, ?, ?)",
+            "INSERT INTO patients (name, email, password, created_at) VALUES (?, ?, ?, ?)",
             (
                 data["name"].strip(),
                 data["email"].strip().lower(),
-                prepare_password_for_storage(data["password"].strip())
+                prepare_password_for_storage(data["password"].strip()),
+                current_timestamp()
             )
         )
     except sqlite3.IntegrityError:
@@ -420,6 +651,62 @@ def my_details():
         "email": user[1]
     })
 
+@app.route("/update-patient-profile", methods=["POST"])
+def update_patient_profile():
+    data = request.json
+    current_email = (data.get("current_email") or "").strip().lower()
+    new_name = (data.get("name") or "").strip()
+    new_email = (data.get("email") or "").strip().lower()
+    new_password = (data.get("password") or "").strip()
+
+    if not current_email:
+        return jsonify({"error": "Current email is required"})
+
+    validation_error = validate_account_input(name=new_name, email=new_email)
+    if validation_error:
+        return jsonify({"error": validation_error})
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT id, password FROM patients WHERE email=?", (current_email,))
+    existing_patient = cursor.fetchone()
+
+    if not existing_patient:
+        conn.close()
+        return jsonify({"error": "Patient not found"}), 404
+
+    stored_password = existing_patient[1]
+    password_to_store = stored_password
+
+    if new_password:
+        password_error = validate_account_input(password=new_password)
+        if password_error:
+            conn.close()
+            return jsonify({"error": password_error})
+        password_to_store = prepare_password_for_storage(new_password)
+
+    try:
+        cursor.execute(
+            """
+            UPDATE patients
+            SET name=?, email=?, password=?
+            WHERE email=?
+            """,
+            (new_name, new_email, password_to_store, current_email)
+        )
+        conn.commit()
+    except sqlite3.IntegrityError:
+        conn.close()
+        return jsonify({"error": "Email already registered"})
+
+    conn.close()
+
+    return jsonify({
+        "message": "Profile updated successfully",
+        "name": new_name,
+        "email": new_email
+    })
+
 # ================= PREDICTION =================
 
 @app.route("/predict", methods=["POST"])
@@ -441,17 +728,24 @@ def predict():
     prediction = model.predict(input_scaled)[0]
 
     result = "High Risk" if prediction == 1 else "Low Risk"
+    prediction_date = current_timestamp()
+    detail_summary = format_prediction_details(data)
+    precautions = get_prediction_precautions(result)
 
     # SAVE
     conn = get_db_connection()
     cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM patients WHERE email=?", (data["email"],))
+    patient_row = cursor.fetchone()
+    patient_name = patient_row[0] if patient_row else "Patient"
 
     cursor.execute(
         "INSERT INTO predictions (email, result, date, details) VALUES (?, ?, ?, ?)",
         (
             data["email"],
             result,
-            datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            prediction_date,
             json.dumps(input_data)
         )
     )
@@ -459,13 +753,15 @@ def predict():
     # DOCTOR SUGGESTION
     doctors = []
     if result == "High Risk":
-        cursor.execute("SELECT name, location FROM doctors")
+        cursor.execute("SELECT name, specialization, location, email FROM doctors")
         rows = cursor.fetchall()
 
         for d in rows:
             doctors.append({
                 "name": d[0],
-                "location": d[1]
+                "specialization": d[1],
+                "location": d[2],
+                "email": d[3]
             })
 
     conn.commit()
@@ -473,7 +769,9 @@ def predict():
 
     return jsonify({
         "prediction": result,
-        "doctors": doctors
+        "doctors": doctors,
+        "email_ready": True,
+        "email_message": "Prediction saved. Click 'Email Me' if you want this report sent to your email."
     })
 
 # HISTORY
@@ -485,7 +783,7 @@ def history():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT result, date, details FROM predictions WHERE email=? ORDER BY id DESC",
+        "SELECT result, date, details, id FROM predictions WHERE email=? ORDER BY id DESC",
         (email,)
     )
 
@@ -495,12 +793,145 @@ def history():
     result = []
     for row in data:
         result.append({
+            "id": row[3] if len(row) > 3 else None,
             "result": row[0],
             "date": row[1],
             "details": json.loads(row[2]) if row[2] else []
         })
 
     return jsonify(result)
+
+@app.route("/email-prediction-report", methods=["POST"])
+def email_prediction_report():
+    email = (request.json.get("email") or "").strip().lower()
+    email_error = validate_account_input(email=email)
+    if email_error:
+        return jsonify({"error": email_error})
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM patients WHERE email=?", (email,))
+    patient_row = cursor.fetchone()
+    if not patient_row:
+        conn.close()
+        return jsonify({"error": "Patient not found"}), 404
+
+    patient_name = patient_row[0]
+
+    cursor.execute(
+        "SELECT result, date, details FROM predictions WHERE email=? ORDER BY id DESC LIMIT 1",
+        (email,)
+    )
+    prediction_row = cursor.fetchone()
+    if not prediction_row:
+        conn.close()
+        return jsonify({"error": "No prediction report available to email"}), 404
+
+    result = prediction_row[0]
+    prediction_date = prediction_row[1]
+    details = json.loads(prediction_row[2]) if prediction_row[2] else []
+    labeled_details = format_prediction_details_from_values(details)
+    precautions = get_prediction_precautions(result)
+
+    doctors = []
+    if result == "High Risk":
+        cursor.execute("SELECT name, specialization, location, email FROM doctors")
+        rows = cursor.fetchall()
+        for row in rows:
+            doctors.append({
+                "name": row[0],
+                "specialization": row[1],
+                "location": row[2],
+                "email": row[3]
+            })
+
+    conn.close()
+
+    email_sent, email_message = send_prediction_report_email(
+        recipient_email=email,
+        patient_name=patient_name,
+        result=result,
+        prediction_date=prediction_date,
+        details=labeled_details,
+        precautions=precautions,
+        doctors=doctors
+    )
+
+    return jsonify({
+        "email_sent": email_sent,
+        "email_message": email_message
+    })
+
+@app.route("/download-prediction-report", methods=["GET"])
+def download_prediction_report():
+    email = (request.args.get("email") or "").strip().lower()
+    prediction_id = request.args.get("prediction_id")
+    email_error = validate_account_input(email=email)
+    if email_error:
+        return jsonify({"error": email_error}), 400
+
+    if not prediction_id or not str(prediction_id).isdigit():
+        return jsonify({"error": "Prediction id is required"}), 400
+
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT name FROM patients WHERE email=?", (email,))
+    patient_row = cursor.fetchone()
+    if not patient_row:
+        conn.close()
+        return jsonify({"error": "Patient not found"}), 404
+
+    patient_name = patient_row[0]
+
+    cursor.execute(
+        "SELECT result, date, details FROM predictions WHERE id=? AND email=?",
+        (int(prediction_id), email)
+    )
+    prediction_row = cursor.fetchone()
+    if not prediction_row:
+        conn.close()
+        return jsonify({"error": "Prediction report not found"}), 404
+
+    result = prediction_row[0]
+    prediction_date = prediction_row[1]
+    details = json.loads(prediction_row[2]) if prediction_row[2] else []
+    labeled_details = format_prediction_details_from_values(details)
+    precautions = get_prediction_precautions(result)
+
+    doctors = []
+    if result == "High Risk":
+        cursor.execute("SELECT name, specialization, location, email FROM doctors")
+        rows = cursor.fetchall()
+        for row in rows:
+            doctors.append({
+                "name": row[0],
+                "specialization": row[1],
+                "location": row[2],
+                "email": row[3]
+            })
+
+    conn.close()
+
+    pdf_buffer = build_prediction_report_pdf(
+        patient_name=patient_name,
+        email=email,
+        result=result,
+        prediction_date=prediction_date,
+        details=labeled_details,
+        precautions=precautions,
+        doctors=doctors
+    )
+
+    safe_stamp = prediction_date.replace(":", "-").replace(" ", "_")
+    filename = f"cardioguard_report_{safe_stamp}.pdf"
+    return send_file(
+        pdf_buffer,
+        as_attachment=True,
+        download_name=filename,
+        mimetype="application/pdf"
+    )
 
 # ================= DOCTOR =================
 
@@ -630,13 +1061,14 @@ def add_doctor():
     cursor = conn.cursor()
 
     cursor.execute(
-        "INSERT INTO doctors (name, specialization, location, email, password) VALUES (?, ?, ?, ?, ?)",
+        "INSERT INTO doctors (name, specialization, location, email, password, created_at) VALUES (?, ?, ?, ?, ?, ?)",
         (
             data["name"].strip(),
             data["specialization"].strip(),
             data["location"].strip(),
             data["email"].strip().lower(),
-            prepare_password_for_storage(data["password"].strip())
+            prepare_password_for_storage(data["password"].strip()),
+            current_timestamp()
         )
     )
 
@@ -847,6 +1279,56 @@ def notifications():
         "total_predictions": predictions,
         "total_doctors": doctors,
         "total_feedback": feedback_count
+    })
+
+@app.route("/admin-analytics", methods=["GET"])
+def admin_analytics():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    labels = []
+    prediction_series = []
+    patient_growth = []
+    doctor_growth = []
+
+    for offset in range(6, -1, -1):
+        day = datetime.now().date().fromordinal(datetime.now().date().toordinal() - offset)
+        day_key = day.strftime("%Y-%m-%d")
+        labels.append(day.strftime("%d %b"))
+
+        cursor.execute("SELECT COUNT(*) FROM predictions WHERE date(date)=?", (day_key,))
+        prediction_series.append(cursor.fetchone()[0])
+
+        cursor.execute("SELECT COUNT(*) FROM patients WHERE date(created_at)=?", (day_key,))
+        patient_growth.append(cursor.fetchone()[0])
+
+        cursor.execute("SELECT COUNT(*) FROM doctors WHERE date(created_at)=?", (day_key,))
+        doctor_growth.append(cursor.fetchone()[0])
+
+    cursor.execute("SELECT COUNT(*) FROM predictions WHERE result='High Risk'")
+    high_risk = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM predictions WHERE result='Low Risk'")
+    low_risk = cursor.fetchone()[0]
+
+    cursor.execute("SELECT COUNT(*) FROM predictions")
+    total_predictions = cursor.fetchone()[0]
+
+    conn.close()
+
+    return jsonify({
+        "labels": labels,
+        "prediction_series": prediction_series,
+        "risk_levels": {
+            "high": high_risk,
+            "low": low_risk,
+            "total": total_predictions
+        },
+        "user_growth": {
+            "patients": patient_growth,
+            "doctors": doctor_growth,
+            "total": [patient_growth[index] + doctor_growth[index] for index in range(len(labels))]
+        }
     })
 
 # ================= RUN =================
