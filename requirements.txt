@@ -1,0 +1,8 @@
+Flask
+Flask-Cors
+numpy
+joblib
+bcrypt
+fpdf
+scikit-learn
+gunicorn

@@ -1,3 +1,10 @@
+function buildApiUrl(path) {
+  const normalizedPath = path.startsWith("/") ? path : `/${path}`;
+  const configuredBase = window.API_BASE_URL || "";
+  const normalizedBase = configuredBase.replace(/\/$/, "");
+  return normalizedBase ? `${normalizedBase}${normalizedPath}` : normalizedPath;
+}
+
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
@@ -55,17 +62,17 @@ function loginUser(event) {
 
   const roleConfig = {
     patient: {
-      endpoint: "http://127.0.0.1:5000/login",
+      endpoint: buildApiUrl("/login"),
       body: { email: identifier, password },
       redirect: "patient_dashboard.html"
     },
     doctor: {
-      endpoint: "http://127.0.0.1:5000/doctor-login",
+      endpoint: buildApiUrl("/doctor-login"),
       body: { email: identifier, password },
       redirect: "doctor_dashboard.html"
     },
     admin: {
-      endpoint: "http://127.0.0.1:5000/admin-login",
+      endpoint: buildApiUrl("/admin-login"),
       body: { username: identifier, email: identifier, password },
       redirect: "admin_dashboard.html"
     }
@@ -130,7 +137,7 @@ async function registerUser(event) {
 
   const hashedPassword = await hashPasswordForTransport(password);
 
-  fetch("http://127.0.0.1:5000/register", {
+  fetch(buildApiUrl("/register"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ name, email, password: hashedPassword })
@@ -187,7 +194,7 @@ async function resetPassword(event) {
 
   const hashedPassword = await hashPasswordForTransport(password);
 
-  fetch("http://127.0.0.1:5000/forgot-password", {
+  fetch(buildApiUrl("/forgot-password"), {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ role, email, password: hashedPassword })

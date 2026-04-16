@@ -77,7 +77,7 @@ python -m venv .venv
 ### 3. Install Python dependencies
 
 ```bash
-pip install flask flask-cors numpy joblib bcrypt fpdf scikit-learn
+pip install -r requirements.txt
 ```
 
 ### 4. Optional: install frontend dependency
@@ -103,6 +103,16 @@ $env:SMTP_USERNAME="your_username"
 $env:SMTP_PASSWORD="your_password"
 $env:SMTP_FROM_EMAIL="noreply@example.com"
 $env:SMTP_USE_TLS="true"
+```
+
+### 6. Configure deployment environment variables
+
+For a fresh deployed environment, set these variables so the first admin account is created automatically:
+
+```powershell
+$env:FLASK_ENV="production"
+$env:ADMIN_USERNAME="admin"
+$env:ADMIN_PASSWORD="change-this-admin-password"
 ```
 
 ## Usage
@@ -133,13 +143,13 @@ http://127.0.0.1:5000
 
 - Patient: register from the registration page, then log in to access prediction, history, profile, and feedback pages
 - Doctor: log in with an assigned doctor account to access doctor dashboard and patient records
-- Admin: log in with the default admin account to manage the platform
+- Admin: log in with the admin account created from the `ADMIN_USERNAME` and `ADMIN_PASSWORD` environment variables
 
-Default admin credentials:
+Example admin credentials:
 
 ```text
 Username: admin
-Password: admin123
+Password: change-this-admin-password
 ```
 
 ### 4. Patient workflow
@@ -224,6 +234,16 @@ Password: admin123
 - The SQLite database is created and managed automatically in `backend/data/database.db`
 - Passwords are stored with bcrypt hashing
 - Prediction reports are intended for screening support only, not medical diagnosis
+- Frontend API calls now use same-origin paths, which makes the app deployment-friendly behind a real domain or reverse proxy
+
+## Deployment Notes
+
+- `requirements.txt` is included for Python dependency installation
+- `wsgi.py` is included for WSGI servers
+- `Procfile` is included for platforms such as Render or Railway
+- Set `FLASK_ENV=production` in hosted environments
+- Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` before first startup if the deployed database is new
+- SQLite is suitable for demos and light usage; PostgreSQL is recommended for more serious production use
 
 ## Future Improvements
 

@@ -1,5 +1,5 @@
 function patientFetchJson(path, options = {}) {
-  return fetch(`http://127.0.0.1:5000${path}`, options).then((res) => res.json());
+  return fetch(path, options).then((res) => res.json());
 }
 
 function getPatientEmail() {
@@ -219,7 +219,7 @@ function downloadPatientPredictionReport(predictionId) {
     return;
   }
 
-  const url = `http://127.0.0.1:5000/download-prediction-report?email=${encodeURIComponent(email)}&prediction_id=${encodeURIComponent(predictionId)}`;
+  const url = `/download-prediction-report?email=${encodeURIComponent(email)}&prediction_id=${encodeURIComponent(predictionId)}`;
   window.open(url, "_blank");
 }
 

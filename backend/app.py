@@ -25,6 +25,8 @@ MODELS_DIR = BASE_DIR / "models"
 DB_PATH = DATA_DIR / "database.db"
 BEST_MODEL_PATH = MODELS_DIR / "best_model.pkl"
 SCALER_PATH = MODELS_DIR / "scaler.pkl"
+DEFAULT_ADMIN_USERNAME = os.environ.get("ADMIN_USERNAME", "").strip()
+DEFAULT_ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "").strip()
 
 PREDICTION_FIELD_LABELS = {
     "age": "Age",
@@ -49,6 +51,9 @@ def get_db_connection():
 
 def current_timestamp():
     return datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+
+def is_production():
+    return os.environ.get("FLASK_ENV", "").strip().lower() == "production"
 
 def get_email_settings():
     host = os.environ.get("SMTP_HOST", "").strip()
@@ -159,11 +164,16 @@ def init_db():
     if "email" not in feedback_columns:
         cursor.execute("ALTER TABLE feedback ADD COLUMN email TEXT")
 
-    cursor.execute("SELECT id FROM admins WHERE username=?", ("admin",))
-    if not cursor.fetchone():
+    if DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD:
+        cursor.execute("SELECT id FROM admins WHERE username=?", (DEFAULT_ADMIN_USERNAME,))
+        admin_exists = cursor.fetchone()
+    else:
+        admin_exists = True
+
+    if not admin_exists:
         cursor.execute(
             "INSERT INTO admins (username, password) VALUES (?, ?)",
-            ("admin", hash_password_value("admin123"))
+            (DEFAULT_ADMIN_USERNAME, hash_password_value(DEFAULT_ADMIN_PASSWORD))
         )
 
     migrate_passwords_to_bcrypt(cursor, "patients", "id")
@@ -1333,4 +1343,8 @@ def admin_analytics():
 
 # ================= RUN =================
 if __name__ == "__main__":
-    app.run(debug=True)
+    app.run(
+        host=os.environ.get("HOST", "0.0.0.0"),
+        port=int(os.environ.get("PORT", "5000")),
+        debug=not is_production()
+    )

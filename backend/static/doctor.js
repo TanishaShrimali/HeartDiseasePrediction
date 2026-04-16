@@ -1,5 +1,5 @@
 function doctorFetchJson(path, options = {}) {
-  return fetch(`http://127.0.0.1:5000${path}`, options).then((res) => res.json());
+  return fetch(path, options).then((res) => res.json());
 }
 
 function ensureDoctorSession() {
