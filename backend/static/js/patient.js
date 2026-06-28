@@ -10,7 +10,26 @@ function setPatientEmail(email) {
   localStorage.setItem("user", email);
 }
 
-let latestPredictionAvailableForEmail = false;
+let latestPredictionReportId = null;
+
+function formatRiskProbability(probability) {
+  if (typeof probability !== "number" || Number.isNaN(probability)) {
+    return null;
+  }
+  return `${(probability * 100).toFixed(1)}%`;
+}
+
+function getStatusBadgeClasses(result, context = "dark") {
+  if (context === "light") {
+    return result === "High Risk"
+      ? "bg-rose-100 text-rose-700"
+      : "bg-emerald-100 text-emerald-700";
+  }
+
+  return result === "High Risk"
+    ? "bg-rose-500/20 text-rose-100"
+    : "bg-emerald-500/20 text-emerald-100";
+}
 
 function escapePatientHtml(value) {
   return String(value ?? "")
@@ -72,7 +91,8 @@ async function loadPatientDashboard() {
   const emailEl = document.getElementById("patient-dashboard-email");
   const predictionsEl = document.getElementById("patient-dashboard-predictions");
   const latestEl = document.getElementById("patient-dashboard-latest");
-  if (!emailEl && !predictionsEl && !latestEl) {
+  const latestStatusEl = document.getElementById("patient-dashboard-latest-status");
+  if (!emailEl && !predictionsEl && !latestEl && !latestStatusEl) {
     return;
   }
 
@@ -89,10 +109,27 @@ async function loadPatientDashboard() {
     });
 
     if (predictionsEl) predictionsEl.textContent = history.length;
-    if (latestEl) latestEl.textContent = history.length ? history[0].result : "No predictions yet";
+    if (latestEl) {
+      latestEl.textContent = history.length
+        ? (formatRiskProbability(history[0].risk_probability) || history[0].result)
+        : "No predictions yet";
+    }
+    if (latestStatusEl) {
+      if (history.length) {
+        latestStatusEl.textContent = history[0].result || "Status unavailable";
+        latestStatusEl.className = `mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${getStatusBadgeClasses(history[0].result, "light")}`;
+      } else {
+        latestStatusEl.textContent = "Status unavailable";
+        latestStatusEl.className = "mt-3 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600";
+      }
+    }
   } catch (error) {
     if (predictionsEl) predictionsEl.textContent = "-";
     if (latestEl) latestEl.textContent = "Unable to load";
+    if (latestStatusEl) {
+      latestStatusEl.textContent = "Status unavailable";
+      latestStatusEl.className = "mt-3 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600";
+    }
   }
 }
 
@@ -250,13 +287,14 @@ async function loadPatientHistory() {
     }
 
     tbody.innerHTML = history.map((item) => {
+      const probabilityText = formatRiskProbability(item.risk_probability);
       const statusClass = item.result === "High Risk"
         ? 'bg-rose-100 text-rose-700'
         : 'bg-emerald-100 text-emerald-700';
       return `
         <tr>
           <td class="px-4 py-4 text-sm text-slate-700">${escapePatientHtml(item.date)}</td>
-          <td class="px-4 py-4 text-sm font-semibold text-slate-900">${escapePatientHtml(item.result)}</td>
+          <td class="px-4 py-4 text-sm font-semibold text-slate-900">${escapePatientHtml(probabilityText || item.result)}</td>
           <td class="px-4 py-4"><span class="rounded-full px-3 py-1 text-xs font-bold ${statusClass}">${escapePatientHtml(item.result)}</span></td>
           <td class="px-4 py-4">
             <button type="button" class="rounded-xl bg-blue-50 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-100" data-download-report-id="${escapePatientHtml(item.id)}">Download PDF</button>
@@ -280,9 +318,10 @@ async function submitPatientPrediction(event) {
 
   const email = getPatientEmail();
   const resultEl = document.getElementById("patient-predict-result");
+  const statusEl = document.getElementById("patient-predict-status");
   const doctorsEl = document.getElementById("patient-predict-doctors");
-  const emailStatusEl = document.getElementById("patient-predict-email-status");
-  const emailButton = document.getElementById("patient-email-report-button");
+  const reportStatusEl = document.getElementById("patient-predict-report-status");
+  const reportButton = document.getElementById("patient-download-report-button");
   if (!email) {
     window.location.href = "login.html";
     return;
@@ -321,19 +360,24 @@ async function submitPatientPrediction(event) {
       body: JSON.stringify(payload)
     });
 
-    if (data.prediction === "High Risk") {
-      resultEl.textContent = "High Risk - Doctor consultation recommended";
+    const probabilityText = formatRiskProbability(data.risk_probability);
+    if (probabilityText) {
+      resultEl.textContent = `${probabilityText} predicted heart disease risk`;
     } else {
       resultEl.textContent = data.prediction || "Prediction complete";
     }
-    doctorsEl.innerHTML = "";
-    latestPredictionAvailableForEmail = Boolean(data.email_ready);
-    if (emailButton) {
-      emailButton.classList.toggle("hidden", !latestPredictionAvailableForEmail);
-      emailButton.disabled = false;
+    if (statusEl) {
+      statusEl.textContent = data.prediction || "Status unavailable";
+      statusEl.className = `mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${getStatusBadgeClasses(data.prediction, "dark")}`;
     }
-    if (emailStatusEl) {
-      emailStatusEl.textContent = data.email_message || "Prediction report status unavailable.";
+    doctorsEl.innerHTML = "";
+    latestPredictionReportId = data.prediction_id || null;
+    if (reportButton) {
+      reportButton.classList.toggle("hidden", !latestPredictionReportId);
+      reportButton.disabled = false;
+    }
+    if (reportStatusEl) {
+      reportStatusEl.textContent = data.report_message || "Prediction saved. Download the PDF report when ready.";
     }
 
     if (data.doctors && data.doctors.length) {
@@ -347,56 +391,27 @@ async function submitPatientPrediction(event) {
     }
   } catch (error) {
     resultEl.textContent = "Unable to submit prediction.";
-    latestPredictionAvailableForEmail = false;
-    if (emailButton) {
-      emailButton.classList.add("hidden");
-      emailButton.disabled = false;
+    if (statusEl) {
+      statusEl.textContent = "Status unavailable";
+      statusEl.className = "mt-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-100";
     }
-    if (emailStatusEl) {
-      emailStatusEl.textContent = "Email report not available because the prediction could not be completed.";
+    latestPredictionReportId = null;
+    if (reportButton) {
+      reportButton.classList.add("hidden");
+      reportButton.disabled = false;
+    }
+    if (reportStatusEl) {
+      reportStatusEl.textContent = "PDF report not available because the prediction could not be completed.";
     }
   }
 }
 
-async function emailLatestPredictionReport() {
-  const email = getPatientEmail();
-  const emailStatusEl = document.getElementById("patient-predict-email-status");
-  const emailButton = document.getElementById("patient-email-report-button");
-
-  if (!email || !latestPredictionAvailableForEmail) {
+function downloadLatestPredictionReport() {
+  if (!latestPredictionReportId) {
     return;
   }
 
-  if (emailStatusEl) {
-    emailStatusEl.textContent = "Sending your prediction report...";
-  }
-  if (emailButton) {
-    emailButton.disabled = true;
-  }
-
-  try {
-    const data = await patientFetchJson("/email-prediction-report", {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ email })
-    });
-
-    if (data.error) {
-      throw new Error(data.error);
-    }
-
-    if (emailStatusEl) {
-      emailStatusEl.textContent = data.email_message || "Prediction report email status unavailable.";
-    }
-  } catch (error) {
-    if (emailStatusEl) {
-      emailStatusEl.textContent = error.message || "Unable to send the email report.";
-    }
-  } finally {
-    if (emailButton) {
-      emailButton.disabled = false;
-    }
-  }
+  downloadPatientPredictionReport(latestPredictionReportId);
 }
 
 async function submitPatientFeedback(event) {
@@ -469,8 +484,8 @@ window.addEventListener("DOMContentLoaded", () => {
     profileReset.addEventListener("click", resetPatientProfileForm);
   }
 
-  const emailReportButton = document.getElementById("patient-email-report-button");
-  if (emailReportButton) {
-    emailReportButton.addEventListener("click", emailLatestPredictionReport);
+  const downloadReportButton = document.getElementById("patient-download-report-button");
+  if (downloadReportButton) {
+    downloadReportButton.addEventListener("click", downloadLatestPredictionReport);
   }
 });

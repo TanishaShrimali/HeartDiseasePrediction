@@ -163,19 +163,20 @@
 
     <aside class="space-y-6">
       <section class="rounded-3xl bg-gradient-to-br from-slate-900 to-blue-900 p-8 text-white shadow-xl">
-        <h2 class="text-2xl font-extrabold">Prediction Result</h2>
+        <h2 class="text-2xl font-extrabold">Risk Prediction</h2>
         <div class="mt-6 rounded-2xl bg-white/10 p-5">
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Current Status</p>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Risk Probability</p>
           <p id="patient-predict-result" class="mt-3 text-3xl font-extrabold">Waiting for input</p>
+          <p id="patient-predict-status" class="mt-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-100">Status unavailable</p>
         </div>
         <div class="mt-5 rounded-2xl bg-white/10 p-5">
           <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Doctor Suggestions</p>
-          <div id="patient-predict-doctors" class="mt-3 space-y-3 text-sm text-blue-50">Doctor suggestions will appear here for high-risk results.</div>
+          <div id="patient-predict-doctors" class="mt-3 space-y-3 text-sm text-blue-50">Doctor suggestions will appear here when the predicted risk is high.</div>
         </div>
         <div class="mt-5 rounded-2xl bg-white/10 p-5">
-          <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">Email Report</p>
-          <div id="patient-predict-email-status" class="mt-3 text-sm text-blue-50">A prediction report can be sent to your registered email after submission.</div>
-          <button id="patient-email-report-button" type="button" class="mt-4 hidden rounded-xl bg-white px-4 py-2 text-sm font-bold text-blue-900 hover:bg-blue-50">Email Me This Report</button>
+          <p class="text-xs font-bold uppercase tracking-[0.2em] text-blue-100">PDF Report</p>
+          <div id="patient-predict-report-status" class="mt-3 text-sm text-blue-50">Submit a prediction to generate a downloadable PDF report.</div>
+          <button id="patient-download-report-button" type="button" class="mt-4 hidden rounded-xl bg-white px-4 py-2 text-sm font-bold text-blue-900 hover:bg-blue-50">Download PDF Report</button>
         </div>
       </section>
 

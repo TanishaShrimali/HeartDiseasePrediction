@@ -15,6 +15,25 @@ function escapePatientHtml(value) {
     .replace(/'/g, "&#39;");
 }
 
+function formatRiskProbability(probability) {
+  if (typeof probability !== "number" || Number.isNaN(probability)) {
+    return null;
+  }
+  return `${(probability * 100).toFixed(1)}%`;
+}
+
+function getStatusBadgeClasses(result, context = "dark") {
+  if (context === "light") {
+    return result === "High Risk"
+      ? "bg-rose-100 text-rose-700"
+      : "bg-emerald-100 text-emerald-700";
+  }
+
+  return result === "High Risk"
+    ? "bg-rose-500/20 text-rose-100"
+    : "bg-emerald-500/20 text-emerald-100";
+}
+
 function ensurePatientSession() {
   const protectedNode = document.querySelector("[data-patient-page='true']");
   if (!protectedNode) {
@@ -66,7 +85,8 @@ async function loadPatientDashboard() {
   const emailEl = document.getElementById("patient-dashboard-email");
   const predictionsEl = document.getElementById("patient-dashboard-predictions");
   const latestEl = document.getElementById("patient-dashboard-latest");
-  if (!emailEl && !predictionsEl && !latestEl) {
+  const latestStatusEl = document.getElementById("patient-dashboard-latest-status");
+  if (!emailEl && !predictionsEl && !latestEl && !latestStatusEl) {
     return;
   }
 
@@ -83,10 +103,27 @@ async function loadPatientDashboard() {
     });
 
     if (predictionsEl) predictionsEl.textContent = history.length;
-    if (latestEl) latestEl.textContent = history.length ? history[0].result : "No predictions yet";
+    if (latestEl) {
+      latestEl.textContent = history.length
+        ? (formatRiskProbability(history[0].risk_probability) || history[0].result)
+        : "No predictions yet";
+    }
+    if (latestStatusEl) {
+      if (history.length) {
+        latestStatusEl.textContent = history[0].result || "Status unavailable";
+        latestStatusEl.className = `mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${getStatusBadgeClasses(history[0].result, "light")}`;
+      } else {
+        latestStatusEl.textContent = "Status unavailable";
+        latestStatusEl.className = "mt-3 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600";
+      }
+    }
   } catch (error) {
     if (predictionsEl) predictionsEl.textContent = "-";
     if (latestEl) latestEl.textContent = "Unable to load";
+    if (latestStatusEl) {
+      latestStatusEl.textContent = "Status unavailable";
+      latestStatusEl.className = "mt-3 inline-flex rounded-full bg-slate-200 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-slate-600";
+    }
   }
 }
 
@@ -154,13 +191,14 @@ async function loadPatientHistory() {
     }
 
     tbody.innerHTML = history.map((item) => {
+      const probabilityText = formatRiskProbability(item.risk_probability);
       const statusClass = item.result === "High Risk"
         ? 'bg-rose-100 text-rose-700'
         : 'bg-emerald-100 text-emerald-700';
       return `
         <tr>
           <td class="px-4 py-4 text-sm text-slate-700">${escapePatientHtml(item.date)}</td>
-          <td class="px-4 py-4 text-sm font-semibold text-slate-900">${escapePatientHtml(item.result)}</td>
+          <td class="px-4 py-4 text-sm font-semibold text-slate-900">${escapePatientHtml(probabilityText || item.result)}</td>
           <td class="px-4 py-4"><span class="rounded-full px-3 py-1 text-xs font-bold ${statusClass}">${escapePatientHtml(item.result)}</span></td>
         </tr>
       `;
@@ -175,6 +213,7 @@ async function submitPatientPrediction(event) {
 
   const email = getPatientEmail();
   const resultEl = document.getElementById("patient-predict-result");
+  const statusEl = document.getElementById("patient-predict-status");
   const doctorsEl = document.getElementById("patient-predict-doctors");
   if (!email) {
     window.location.href = "login.html";
@@ -214,10 +253,15 @@ async function submitPatientPrediction(event) {
       body: JSON.stringify(payload)
     });
 
-    if (data.prediction === "High Risk") {
-      resultEl.textContent = "High Risk - Doctor consultation recommended";
+    const probabilityText = formatRiskProbability(data.risk_probability);
+    if (probabilityText) {
+      resultEl.textContent = `${probabilityText} predicted heart disease risk`;
     } else {
       resultEl.textContent = data.prediction || "Prediction complete";
+    }
+    if (statusEl) {
+      statusEl.textContent = data.prediction || "Status unavailable";
+      statusEl.className = `mt-3 inline-flex rounded-full px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] ${getStatusBadgeClasses(data.prediction, "dark")}`;
     }
     doctorsEl.innerHTML = "";
 
@@ -231,6 +275,10 @@ async function submitPatientPrediction(event) {
     }
   } catch (error) {
     resultEl.textContent = "Unable to submit prediction.";
+    if (statusEl) {
+      statusEl.textContent = "Status unavailable";
+      statusEl.className = "mt-3 inline-flex rounded-full bg-white/10 px-3 py-1 text-xs font-bold uppercase tracking-[0.16em] text-blue-100";
+    }
   }
 }
 

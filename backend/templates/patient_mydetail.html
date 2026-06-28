@@ -81,12 +81,28 @@
 
         <div>
           <label for="edit-patient-password" class="mb-2 block text-sm font-semibold text-slate-700">New Password</label>
-          <input id="edit-patient-password" type="password" placeholder="Leave blank to keep current password" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <div class="relative">
+            <input id="edit-patient-password" type="password" placeholder="Leave blank to keep current password" class="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 outline-none focus:border-blue-500">
+            <button type="button" data-password-target="edit-patient-password" aria-label="Show password" aria-pressed="false" title="Show password" class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-500 hover:text-blue-700">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div>
           <label for="edit-patient-confirm-password" class="mb-2 block text-sm font-semibold text-slate-700">Confirm New Password</label>
-          <input id="edit-patient-confirm-password" type="password" placeholder="Re-enter the new password" class="w-full rounded-xl border border-slate-300 px-4 py-3 outline-none focus:border-blue-500">
+          <div class="relative">
+            <input id="edit-patient-confirm-password" type="password" placeholder="Re-enter the new password" class="w-full rounded-xl border border-slate-300 px-4 py-3 pr-12 outline-none focus:border-blue-500">
+            <button type="button" data-password-target="edit-patient-confirm-password" aria-label="Show password" aria-pressed="false" title="Show password" class="absolute inset-y-0 right-0 flex items-center px-4 text-slate-500 hover:text-blue-700">
+              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                <path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7Z"></path>
+                <circle cx="12" cy="12" r="3"></circle>
+              </svg>
+            </button>
+          </div>
         </div>
 
         <div class="md:col-span-2 flex flex-wrap gap-4">

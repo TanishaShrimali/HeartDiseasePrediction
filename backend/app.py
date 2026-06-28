@@ -9,9 +9,6 @@ import re
 import bcrypt
 from pathlib import Path
 import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
 from io import BytesIO
 from flask import send_file
 from fpdf import FPDF
@@ -54,23 +51,6 @@ def current_timestamp():
 
 def is_production():
     return os.environ.get("FLASK_ENV", "").strip().lower() == "production"
-
-def get_email_settings():
-    host = os.environ.get("SMTP_HOST", "").strip()
-    port = int(os.environ.get("SMTP_PORT", "587"))
-    username = os.environ.get("SMTP_USERNAME", "").strip()
-    password = os.environ.get("SMTP_PASSWORD", "").strip()
-    from_email = os.environ.get("SMTP_FROM_EMAIL", username).strip()
-    use_tls = os.environ.get("SMTP_USE_TLS", "true").strip().lower() != "false"
-
-    return {
-        "host": host,
-        "port": port,
-        "username": username,
-        "password": password,
-        "from_email": from_email,
-        "use_tls": use_tls
-    }
 
 # ================= LOAD MODEL =================
 model = joblib.load(BEST_MODEL_PATH)
@@ -158,6 +138,8 @@ def init_db():
     prediction_columns = [row[1] for row in cursor.fetchall()]
     if "details" not in prediction_columns:
         cursor.execute("ALTER TABLE predictions ADD COLUMN details TEXT")
+    if "risk_probability" not in prediction_columns:
+        cursor.execute("ALTER TABLE predictions ADD COLUMN risk_probability REAL")
 
     cursor.execute("PRAGMA table_info(feedback)")
     feedback_columns = [row[1] for row in cursor.fetchall()]
@@ -170,7 +152,12 @@ def init_db():
     else:
         admin_exists = True
 
-    if not admin_exists:
+    if DEFAULT_ADMIN_USERNAME and DEFAULT_ADMIN_PASSWORD and admin_exists:
+        cursor.execute(
+            "UPDATE admins SET password=? WHERE username=?",
+            (hash_password_value(DEFAULT_ADMIN_PASSWORD), DEFAULT_ADMIN_USERNAME)
+        )
+    elif not admin_exists:
         cursor.execute(
             "INSERT INTO admins (username, password) VALUES (?, ?)",
             (DEFAULT_ADMIN_USERNAME, hash_password_value(DEFAULT_ADMIN_PASSWORD))
@@ -275,104 +262,12 @@ def get_prediction_precautions(result):
         "Repeat screening if symptoms appear or risk factors increase."
     ]
 
-def build_prediction_email_html(patient_name, email, result, prediction_date, details, precautions, doctors):
-    doctor_block = ""
-    if doctors:
-        doctor_rows = "".join(
-            f"<li><strong>{doctor['name']}</strong> - {doctor['specialization']}, {doctor['location']}"
-            + (f" ({doctor['email']})" if doctor.get("email") else "")
-            + "</li>"
-            for doctor in doctors
-        )
-        doctor_block = f"""
-        <h3 style="margin-top:24px;color:#0f172a;">Recommended Doctors</h3>
-        <ul style="padding-left:18px;color:#334155;line-height:1.7;">{doctor_rows}</ul>
-        """
+def format_risk_probability(probability):
+    if probability is None:
+        return "N/A"
+    return f"{float(probability) * 100:.1f}%"
 
-    detail_rows = "".join(
-        f"<tr><td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;color:#334155;'>{item['label']}</td>"
-        f"<td style='padding:10px 12px;border-bottom:1px solid #e2e8f0;font-weight:700;color:#0f172a;'>{item['value']}</td></tr>"
-        for item in details
-    )
-    precaution_rows = "".join(
-        f"<li style='margin-bottom:8px;'>{item}</li>"
-        for item in precautions
-    )
-
-    status_color = "#f43f5e" if result == "High Risk" else "#10b981"
-    status_note = "Doctor consultation is recommended." if result == "High Risk" else "Continue preventive care and healthy habits."
-
-    return f"""
-    <div style="font-family:Arial,sans-serif;background:#f8fafc;padding:24px;color:#0f172a;">
-      <div style="max-width:760px;margin:0 auto;background:#ffffff;border:1px solid #e2e8f0;border-radius:24px;overflow:hidden;">
-        <div style="background:linear-gradient(135deg,#0f172a,#0f4c81,#0891b2);padding:28px 32px;color:white;">
-          <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.2em;text-transform:uppercase;color:#bfdbfe;">CardioGuard Prediction Report</p>
-          <h1 style="margin:12px 0 0;font-size:30px;line-height:1.2;">Your Heart Risk Result</h1>
-          <p style="margin:10px 0 0;font-size:15px;color:#dbeafe;">Generated on {prediction_date} for {email}</p>
-        </div>
-        <div style="padding:32px;">
-          <p style="margin:0 0 16px;font-size:16px;color:#334155;">Hello {patient_name or 'Patient'},</p>
-          <div style="border-radius:20px;padding:20px;background:#f8fafc;border:1px solid #e2e8f0;">
-            <p style="margin:0;font-size:12px;font-weight:700;letter-spacing:0.18em;text-transform:uppercase;color:#64748b;">Prediction Status</p>
-            <p style="margin:12px 0 4px;font-size:34px;font-weight:800;color:{status_color};">{result}</p>
-            <p style="margin:0;color:#475569;">{status_note}</p>
-          </div>
-
-          <h3 style="margin-top:28px;color:#0f172a;">Submitted Details</h3>
-          <table style="width:100%;border-collapse:collapse;border:1px solid #e2e8f0;border-radius:16px;overflow:hidden;">
-            <tbody>{detail_rows}</tbody>
-          </table>
-
-          <h3 style="margin-top:24px;color:#0f172a;">Suggested Precautions</h3>
-          <ul style="padding-left:18px;color:#334155;line-height:1.7;">{precaution_rows}</ul>
-
-          {doctor_block}
-
-          <div style="margin-top:28px;padding:18px;border-radius:18px;background:#eff6ff;border:1px solid #bfdbfe;">
-            <p style="margin:0 0 8px;font-weight:700;color:#1d4ed8;">Important Note</p>
-            <p style="margin:0;color:#1e3a8a;line-height:1.6;">
-              This report is generated from the selected machine learning model and supports screening only. It does not replace professional diagnosis or emergency care.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-    """
-
-def send_prediction_report_email(recipient_email, patient_name, result, prediction_date, details, precautions, doctors):
-    settings = get_email_settings()
-    if not settings["host"] or not settings["from_email"]:
-        return False, "Email settings are not configured."
-
-    subject = f"CardioGuard Prediction Report - {result}"
-    html_body = build_prediction_email_html(
-        patient_name=patient_name,
-        email=recipient_email,
-        result=result,
-        prediction_date=prediction_date,
-        details=details,
-        precautions=precautions,
-        doctors=doctors
-    )
-
-    message = MIMEMultipart("alternative")
-    message["Subject"] = subject
-    message["From"] = settings["from_email"]
-    message["To"] = recipient_email
-    message.attach(MIMEText(html_body, "html"))
-
-    try:
-        with smtplib.SMTP(settings["host"], settings["port"], timeout=20) as server:
-            if settings["use_tls"]:
-                server.starttls()
-            if settings["username"] and settings["password"]:
-                server.login(settings["username"], settings["password"])
-            server.sendmail(settings["from_email"], [recipient_email], message.as_string())
-        return True, "Prediction report email sent successfully."
-    except Exception as error:
-        return False, f"Prediction saved, but email could not be sent: {error}"
-
-def build_prediction_report_pdf(patient_name, email, result, prediction_date, details, precautions, doctors):
+def build_prediction_report_pdf(patient_name, email, result, prediction_date, details, precautions, doctors, risk_probability=None):
     pdf = FPDF()
     pdf.set_auto_page_break(auto=True, margin=15)
     pdf.add_page()
@@ -388,6 +283,7 @@ def build_prediction_report_pdf(patient_name, email, result, prediction_date, de
 
     pdf.ln(4)
     pdf.set_font("Arial", "B", 14)
+    pdf.cell(0, 10, f"Risk Probability: {format_risk_probability(risk_probability)}", ln=True)
     pdf.cell(0, 10, f"Prediction Result: {result}", ln=True)
 
     pdf.set_font("Arial", "", 11)
@@ -736,6 +632,7 @@ def predict():
 
     input_scaled = scaler.transform([input_data])
     prediction = model.predict(input_scaled)[0]
+    risk_probability = float(model.predict_proba(input_scaled)[0][1])
 
     result = "High Risk" if prediction == 1 else "Low Risk"
     prediction_date = current_timestamp()
@@ -751,14 +648,16 @@ def predict():
     patient_name = patient_row[0] if patient_row else "Patient"
 
     cursor.execute(
-        "INSERT INTO predictions (email, result, date, details) VALUES (?, ?, ?, ?)",
+        "INSERT INTO predictions (email, result, date, details, risk_probability) VALUES (?, ?, ?, ?, ?)",
         (
             data["email"],
             result,
             prediction_date,
-            json.dumps(input_data)
+            json.dumps(input_data),
+            risk_probability
         )
     )
+    prediction_id = cursor.lastrowid
 
     # DOCTOR SUGGESTION
     doctors = []
@@ -779,9 +678,10 @@ def predict():
 
     return jsonify({
         "prediction": result,
+        "risk_probability": risk_probability,
         "doctors": doctors,
-        "email_ready": True,
-        "email_message": "Prediction saved. Click 'Email Me' if you want this report sent to your email."
+        "prediction_id": prediction_id,
+        "report_message": "Prediction saved. Download the PDF report when ready."
     })
 
 # HISTORY
@@ -793,7 +693,7 @@ def history():
     cursor = conn.cursor()
 
     cursor.execute(
-        "SELECT result, date, details, id FROM predictions WHERE email=? ORDER BY id DESC",
+        "SELECT result, date, details, id, risk_probability FROM predictions WHERE email=? ORDER BY id DESC",
         (email,)
     )
 
@@ -806,72 +706,11 @@ def history():
             "id": row[3] if len(row) > 3 else None,
             "result": row[0],
             "date": row[1],
+            "risk_probability": row[4] if len(row) > 4 else None,
             "details": json.loads(row[2]) if row[2] else []
         })
 
     return jsonify(result)
-
-@app.route("/email-prediction-report", methods=["POST"])
-def email_prediction_report():
-    email = (request.json.get("email") or "").strip().lower()
-    email_error = validate_account_input(email=email)
-    if email_error:
-        return jsonify({"error": email_error})
-
-    conn = get_db_connection()
-    cursor = conn.cursor()
-
-    cursor.execute("SELECT name FROM patients WHERE email=?", (email,))
-    patient_row = cursor.fetchone()
-    if not patient_row:
-        conn.close()
-        return jsonify({"error": "Patient not found"}), 404
-
-    patient_name = patient_row[0]
-
-    cursor.execute(
-        "SELECT result, date, details FROM predictions WHERE email=? ORDER BY id DESC LIMIT 1",
-        (email,)
-    )
-    prediction_row = cursor.fetchone()
-    if not prediction_row:
-        conn.close()
-        return jsonify({"error": "No prediction report available to email"}), 404
-
-    result = prediction_row[0]
-    prediction_date = prediction_row[1]
-    details = json.loads(prediction_row[2]) if prediction_row[2] else []
-    labeled_details = format_prediction_details_from_values(details)
-    precautions = get_prediction_precautions(result)
-
-    doctors = []
-    if result == "High Risk":
-        cursor.execute("SELECT name, specialization, location, email FROM doctors")
-        rows = cursor.fetchall()
-        for row in rows:
-            doctors.append({
-                "name": row[0],
-                "specialization": row[1],
-                "location": row[2],
-                "email": row[3]
-            })
-
-    conn.close()
-
-    email_sent, email_message = send_prediction_report_email(
-        recipient_email=email,
-        patient_name=patient_name,
-        result=result,
-        prediction_date=prediction_date,
-        details=labeled_details,
-        precautions=precautions,
-        doctors=doctors
-    )
-
-    return jsonify({
-        "email_sent": email_sent,
-        "email_message": email_message
-    })
 
 @app.route("/download-prediction-report", methods=["GET"])
 def download_prediction_report():
@@ -896,7 +735,7 @@ def download_prediction_report():
     patient_name = patient_row[0]
 
     cursor.execute(
-        "SELECT result, date, details FROM predictions WHERE id=? AND email=?",
+        "SELECT result, date, details, risk_probability FROM predictions WHERE id=? AND email=?",
         (int(prediction_id), email)
     )
     prediction_row = cursor.fetchone()
@@ -907,6 +746,7 @@ def download_prediction_report():
     result = prediction_row[0]
     prediction_date = prediction_row[1]
     details = json.loads(prediction_row[2]) if prediction_row[2] else []
+    risk_probability = prediction_row[3] if len(prediction_row) > 3 else None
     labeled_details = format_prediction_details_from_values(details)
     precautions = get_prediction_precautions(result)
 
@@ -931,7 +771,8 @@ def download_prediction_report():
         prediction_date=prediction_date,
         details=labeled_details,
         precautions=precautions,
-        doctors=doctors
+        doctors=doctors,
+        risk_probability=risk_probability
     )
 
     safe_stamp = prediction_date.replace(":", "-").replace(" ", "_")

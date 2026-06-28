@@ -53,6 +53,26 @@ function requireRoleSession(expectedRole) {
   return true;
 }
 
+function togglePasswordVisibility(button) {
+  const targetId = button?.dataset?.passwordTarget || "";
+  const input = targetId ? document.getElementById(targetId) : null;
+  if (!input) {
+    return;
+  }
+
+  const showingPassword = input.type === "text";
+  input.type = showingPassword ? "password" : "text";
+  button.setAttribute("aria-pressed", showingPassword ? "false" : "true");
+  button.setAttribute("aria-label", showingPassword ? "Show password" : "Hide password");
+  button.setAttribute("title", showingPassword ? "Show password" : "Hide password");
+}
+
+function initPasswordToggles() {
+  document.querySelectorAll("[data-password-target]").forEach((button) => {
+    button.addEventListener("click", () => togglePasswordVisibility(button));
+  });
+}
+
 window.logoutUser = logoutUser;
 window.requireRoleSession = requireRoleSession;
 window.getStoredRole = getStoredRole;
@@ -98,4 +118,6 @@ window.addEventListener("DOMContentLoaded", () => {
   document.querySelectorAll("[data-logout='true']").forEach((button) => {
     button.addEventListener("click", logoutUser);
   });
+
+  initPasswordToggles();
 });

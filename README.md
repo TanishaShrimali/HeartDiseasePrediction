@@ -2,7 +2,7 @@
 
 CardioGuard is a role-based web application for heart disease risk screening and patient record management. It combines a Flask backend, a machine learning prediction model, SQLite storage, and Tailwind-powered frontend pages to support three user groups: patients, doctors, and administrators.
 
-The project allows patients to register, submit heart-health parameters for prediction, review their prediction history, download PDF reports, and optionally receive reports by email. Doctors can review patient records, while administrators can manage doctors, patients, feedback, and analytics from a dedicated dashboard.
+The project allows patients to register, submit heart-health parameters for prediction, review their prediction history, and download PDF reports. Doctors can review patient records, while administrators can manage doctors, patients, feedback, and analytics from a dedicated dashboard.
 
 ## Project Description
 
@@ -17,7 +17,6 @@ CardioGuard is intended for screening support and workflow management. It is not
 - Separate role-based login flows for patients, doctors, and admins
 - Patient dashboard with prediction history and profile management
 - Downloadable PDF prediction reports
-- Optional prediction report delivery through SMTP email
 - Doctor suggestions for high-risk cases
 - Doctor dashboard for viewing patient records
 - Admin dashboard with platform statistics and analytics
@@ -35,7 +34,6 @@ CardioGuard is intended for screening support and workflow management. It is not
 - Database: SQLite
 - Authentication/Security: bcrypt
 - Reporting: FPDF
-- Optional Email Delivery: SMTP
 
 ## Project Structure
 
@@ -92,29 +90,6 @@ npm install
 cd ..
 ```
 
-### 5. Optional: configure email delivery
-
-Set these environment variables only if you want prediction reports emailed to patients:
-
-```powershell
-$env:SMTP_HOST="smtp.example.com"
-$env:SMTP_PORT="587"
-$env:SMTP_USERNAME="your_username"
-$env:SMTP_PASSWORD="your_password"
-$env:SMTP_FROM_EMAIL="noreply@example.com"
-$env:SMTP_USE_TLS="true"
-```
-
-### 6. Configure deployment environment variables
-
-For a fresh deployed environment, set these variables so the first admin account is created automatically:
-
-```powershell
-$env:FLASK_ENV="production"
-$env:ADMIN_USERNAME="admin"
-$env:ADMIN_PASSWORD="change-this-admin-password"
-```
-
 ## Usage
 
 ### 1. Start the application
@@ -160,7 +135,7 @@ Password: change-this-admin-password
 4. Enter the required health values
 5. Submit the form to receive a `High Risk` or `Low Risk` result
 6. Review doctor recommendations for high-risk outcomes
-7. Download the generated PDF report or email the latest report if SMTP is configured
+7. Download the generated PDF report
 
 ## Screenshots
 
@@ -234,20 +209,15 @@ Password: change-this-admin-password
 - The SQLite database is created and managed automatically in `backend/data/database.db`
 - Passwords are stored with bcrypt hashing
 - Prediction reports are intended for screening support only, not medical diagnosis
-- Frontend API calls now use same-origin paths, which makes the app deployment-friendly behind a real domain or reverse proxy
 
-## Deployment Notes
+## Deployment
 
-- `requirements.txt` is included for Python dependency installation
-- `wsgi.py` is included for WSGI servers
-- `Procfile` is included for platforms such as Render or Railway
-- Set `FLASK_ENV=production` in hosted environments
-- Set `ADMIN_USERNAME` and `ADMIN_PASSWORD` before first startup if the deployed database is new
-- SQLite is suitable for demos and light usage; PostgreSQL is recommended for more serious production use
+- `wsgi.py` exposes the Flask app for Gunicorn.
+- `Procfile` and `render.yaml` are included for hosted deployment.
+- `.python-version` pins the hosted Python runtime for package compatibility.
+- See `docs/DEPLOYMENT.md` for the Render deployment checklist.
 
 ## Future Improvements
 
-- Add a `requirements.txt` file for repeatable Python setup
 - Add automated tests for prediction and authentication flows
-- Improve deployment configuration for production hosting
 - Store secrets securely with environment-based configuration management
